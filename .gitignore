@@ -1,0 +1,18 @@
+# 依赖与本地配置
+node_modules/
+.env
+*.local
+
+# uniapp 编译输出
+unpackage/
+
+# 后台数据库与上传
+server/data/
+server/uploads/
+
+# IDE
+.idea/
+
+# 系统与日志
+.DS_Store
+*.log

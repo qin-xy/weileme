@@ -1,0 +1,51 @@
+{
+	"pages": [
+		{
+			"path": "pages/index/index",
+			"style": {
+				"navigationBarTitleText": "喂了么-首页"
+			}
+		},
+		{
+			"path": "pages/order/create",
+			"style": {
+				"navigationBarTitleText": "宠物上门服务下单"
+			}
+		},
+		{
+			"path": "pages/worker/register",
+			"style": {
+				"navigationBarTitleText": "上门人登记"
+			}
+		},
+		{
+			"path": "pages/worker/orders",
+			"style": {
+				"navigationBarTitleText": "任务中心"
+			}
+		},
+		{
+			"path": "pages/worker/upload",
+			"style": {
+				"navigationBarTitleText": "服务过程记录"
+			}
+		}
+	],
+	"globalStyle": {
+		"navigationBarTextStyle": "black",
+		"navigationBarTitleText": "喂了么",
+		"navigationBarBackgroundColor": "#F8F8F8",
+		"backgroundColor": "#F8F8F8"
+	},
+	"uniIdRouter": {},
+	"condition" : { //模式配置，仅开发期间生效
+		"current": 0, //当前激活的模式(list 的索引项)
+		"list": [
+			{
+				"name": "", //模式名称
+				"path": "", //启动页面，必选
+				"query": "" //启动参数，在页面的onLoad函数里面得到
+			}
+		]
+	}
+}
