@@ -24,20 +24,32 @@ function request(options) {
 
 // 订单
 export function createOrder(body) {
-  return request({ method: 'POST', url: '/api/orders', data: body });
+  // 添加角色信息
+  const data = {
+    ...body,
+    role: body.role || 'client',
+    customerWechatName: body.customerWechatName || '',
+    customerWechatAvatar: body.customerWechatAvatar || '',
+    workerWechatId: body.workerWechatId || ''
+  };
+  return request({ method: 'POST', url: '/api/orders', data });
 }
+
 export function getOrders(params = {}) {
   const parts = [];
   Object.keys(params).forEach(k => { if (params[k] !== undefined && params[k] !== '') parts.push(k + '=' + encodeURIComponent(params[k])); });
   const q = parts.length ? '?' + parts.join('&') : '';
   return request({ method: 'GET', url: '/api/orders' + q });
 }
+
 export function getOrderById(id) {
   return request({ method: 'GET', url: '/api/orders/' + id });
 }
+
 export function acceptOrder(orderId, workerId) {
   return request({ method: 'PATCH', url: '/api/orders/' + orderId + '/accept', data: { workerId } });
 }
+
 export function completeOrder(orderId, media = []) {
   return request({ method: 'PATCH', url: '/api/orders/' + orderId + '/complete', data: { media } });
 }
@@ -67,9 +79,19 @@ export function uploadOrderMedia(orderId, filePath, type = 'image') {
 export function registerWorker(body) {
   return request({ method: 'POST', url: '/api/workers', data: body });
 }
+
 export function updateWorker(id, body) {
   return request({ method: 'PUT', url: '/api/workers/' + id, data: body });
 }
+
 export function getWorkerById(id) {
   return request({ method: 'GET', url: '/api/workers/' + id });
+}
+
+export function getWorkerByWechatId(wechatId) {
+  return request({ method: 'GET', url: '/api/workers/wechat/' + wechatId });
+}
+
+export function updateWorkerStatus(id, status) {
+  return request({ method: 'PATCH', url: '/api/workers/' + id + '/status', data: { serviceStatus: status } });
 }

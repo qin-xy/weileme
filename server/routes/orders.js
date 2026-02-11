@@ -17,14 +17,28 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 20 * 1024 * 1024 } });
 
-// 创建订单（客户下单）
+// 创建订单（客户下单或上门人直接创建）
 router.post('/', (req, res) => {
   try {
-    const { date, address, latitude, longitude, wechatId, remark } = req.body;
+    const { date, address, latitude, longitude, wechatId, remark, role, customerWechatName, customerWechatAvatar, workerWechatId } = req.body;
+
     if (!date || !address || !wechatId) {
       return res.status(400).json({ code: 400, message: '缺少 date / address / wechatId' });
     }
-    const order = db.createOrder({ date, address, latitude, longitude, wechatId, remark });
+
+    const order = db.createOrder({
+      date,
+      address,
+      latitude,
+      longitude,
+      customerWechatId: wechatId,
+      customerWechatName: customerWechatName || '',
+      customerWechatAvatar: customerWechatAvatar || '',
+      workerWechatId: workerWechatId || '',
+      remark,
+      role: role || 'client'
+    });
+
     res.json({ code: 0, data: order });
   } catch (e) {
     res.status(500).json({ code: 500, message: e.message });
