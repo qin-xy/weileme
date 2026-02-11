@@ -1,9 +1,11 @@
+import config from '../config.js';
+
 /**
  * 接口与运行配置
- * 留空 BASE_URL 时前端继续使用本地存储；填写后请求后台接口
+ * 统一从根目录的 config.js 获取
  */
-export const BASE_URL = ''; // 例如: 'http://localhost:3000' 或 'https://your-domain.com'
+export const BASE_URL = config.BASE_URL;
 
 export function useApi() {
-  return !!BASE_URL;
+  return config.USE_API && !!BASE_URL;
 }
