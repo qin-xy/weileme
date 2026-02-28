@@ -10,314 +10,438 @@ const db = new Database(dbPath);
 
 function initSchema() {
   db.exec(`
-    CREATE TABLE IF NOT EXISTS customers (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      wechat_id TEXT UNIQUE NOT NULL,
-      wechat_name TEXT,
-      wechat_avatar TEXT,
+    -- 宠物表
+    CREATE TABLE IF NOT EXISTS pets (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      breed TEXT,
+      gender TEXT CHECK (gender IN ('male', 'female', '')),
+      birthday TEXT,
+      weight REAL,
+      avatar TEXT,
+      user_id TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
     );
 
-    CREATE TABLE IF NOT EXISTS workers (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      wechat_id TEXT UNIQUE,
-      wechat_name TEXT,
-      wechat_avatar TEXT,
-      address TEXT NOT NULL,
-      latitude REAL NOT NULL,
-      longitude REAL NOT NULL,
-      last_update_time INTEGER NOT NULL,
-      service_status TEXT NOT NULL DEFAULT 'offline' CHECK (service_status IN ('online','offline')),
-      created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
-    );
-
-    CREATE TABLE IF NOT EXISTS orders (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+    -- 行为记录表
+    CREATE TABLE IF NOT EXISTS records (
+      id TEXT PRIMARY KEY,
+      pet_id TEXT NOT NULL,
+      type TEXT NOT NULL,
       date TEXT NOT NULL,
-      address TEXT NOT NULL,
-      latitude REAL,
-      longitude REAL,
-      customer_id INTEGER REFERENCES customers(id),
-      customer_wechat_id TEXT NOT NULL,
-      customer_wechat_name TEXT,
-      worker_id INTEGER REFERENCES workers(id),
-      worker_wechat_id TEXT,
-      remark TEXT DEFAULT '',
-      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','completed')),
-      service_duration INTEGER DEFAULT 0,
-      service_fee REAL DEFAULT 0,
+      remark TEXT,
+      images TEXT,
+      weight REAL,
+      next_reminder TEXT,
+      user_id TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+      FOREIGN KEY (pet_id) REFERENCES pets(id) ON DELETE CASCADE
+    );
+
+    -- 提醒表
+    CREATE TABLE IF NOT EXISTS reminders (
+      id TEXT PRIMARY KEY,
+      pet_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      target_date TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','reminded','completed')),
+      user_id TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+      FOREIGN KEY (pet_id) REFERENCES pets(id) ON DELETE CASCADE
+    );
+
+    -- 用户表
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      openid TEXT UNIQUE,
+      nickname TEXT,
+      avatar TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
     );
 
-    CREATE TABLE IF NOT EXISTS order_media (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-      url TEXT NOT NULL,
-      type TEXT NOT NULL DEFAULT 'image' CHECK (type IN ('image','video')),
-      description TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
-    CREATE INDEX IF NOT EXISTS idx_orders_worker_id ON orders(worker_id);
-    CREATE INDEX IF NOT EXISTS idx_orders_customer_id ON orders(customer_id);
-    CREATE INDEX IF NOT EXISTS idx_orders_customer_wechat_id ON orders(customer_wechat_id);
-    CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);
-    CREATE INDEX IF NOT EXISTS idx_order_media_order_id ON order_media(order_id);
-    CREATE INDEX IF NOT EXISTS idx_workers_wechat_id ON workers(wechat_id);
-    CREATE INDEX IF NOT EXISTS idx_customers_wechat_id ON customers(wechat_id);
+    -- 创建索引
+    CREATE INDEX IF NOT EXISTS idx_records_pet_id ON records(pet_id);
+    CREATE INDEX IF NOT EXISTS idx_records_user_id ON records(user_id);
+    CREATE INDEX IF NOT EXISTS idx_records_type ON records(type);
+    CREATE INDEX IF NOT EXISTS idx_records_date ON records(date);
+    CREATE INDEX IF NOT EXISTS idx_reminders_pet_id ON reminders(pet_id);
+    CREATE INDEX IF NOT EXISTS idx_reminders_user_id ON reminders(user_id);
+    CREATE INDEX IF NOT EXISTS idx_reminders_status ON reminders(status);
+    CREATE INDEX IF NOT EXISTS idx_reminders_target_date ON reminders(target_date);
+    CREATE INDEX IF NOT EXISTS idx_pets_user_id ON pets(user_id);
   `);
 }
 
-// 将订单行转为前端使用的驼峰字段
-function rowToOrder(row) {
+// 宠物相关函数
+function rowToPet(row) {
   if (!row) return null;
   return {
     id: row.id,
-    date: row.date,
-    address: row.address,
-    latitude: row.latitude,
-    longitude: row.longitude,
-    customerId: row.customer_id,
-    customerWechatId: row.customer_wechat_id,
-    customerWechatName: row.customer_wechat_name,
-    workerId: row.worker_id,
-    workerWechatId: row.worker_wechat_id,
-    remark: row.remark || '',
-    status: row.status,
-    serviceDuration: row.service_duration,
-    serviceFee: row.service_fee,
-    serviceMedia: row.serviceMedia || [],
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
+    name: row.name,
+    type: row.type,
+    breed: row.breed,
+    gender: row.gender,
+    birthday: row.birthday,
+    weight: row.weight,
+    avatar: row.avatar,
+    userId: row.user_id,
+    createTime: row.created_at,
+    updateTime: row.updated_at
   };
 }
 
-// 列表查询：可带 serviceMedia（完成单）
-function getOrders(filters = {}) {
-  const { status, wechatId, workerId, limit = 100, offset = 0 } = filters;
-  let sql = `
-    SELECT o.id, o.date, o.address, o.latitude, o.longitude, o.customer_wechat_id, o.remark, o.status, o.worker_id, o.created_at, o.updated_at
-    FROM orders o
-    WHERE 1=1
-  `;
-  const params = [];
-  if (status) { sql += ' AND o.status = ?'; params.push(status); }
-  if (wechatId) { sql += ' AND o.customer_wechat_id = ?'; params.push(wechatId); }
-  if (workerId != null) { sql += ' AND o.worker_id = ?'; params.push(workerId); }
-  sql += ' ORDER BY o.created_at DESC LIMIT ? OFFSET ?';
-  params.push(limit, offset);
-
-  const rows = db.prepare(sql).all(...params);
-  const list = rows.map(r => rowToOrder(r));
-  // 为已完成订单附加 serviceMedia
-  const completedIds = list.filter(o => o.status === 'completed').map(o => o.id);
-  if (completedIds.length) {
-    const mediaRows = db.prepare('SELECT order_id, url, type FROM order_media WHERE order_id IN (' + completedIds.join(',') + ') ORDER BY order_id, id').all();
-    const byOrder = {};
-    mediaRows.forEach(m => {
-      if (!byOrder[m.order_id]) byOrder[m.order_id] = [];
-      byOrder[m.order_id].push({ url: m.url, type: m.type });
-    });
-    list.forEach(o => {
-      o.serviceMedia = byOrder[o.id] || [];
-    });
-  }
-  return list;
+function getPets(userId) {
+  const rows = db.prepare('SELECT * FROM pets WHERE user_id = ? ORDER BY created_at DESC').all(userId);
+  return rows.map(rowToPet);
 }
 
-function getOrderById(id) {
-  const row = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
-  const order = rowToOrder(row);
-  if (order && order.status === 'completed') {
-    order.serviceMedia = db.prepare('SELECT url, type FROM order_media WHERE order_id = ? ORDER BY id').all(id).map(m => ({ url: m.url, type: m.type }));
-  }
-  return order;
+function getPetById(id) {
+  const row = db.prepare('SELECT * FROM pets WHERE id = ?').get(id);
+  return rowToPet(row);
 }
 
-function createOrder(data) {
-  // 查找或创建客户
-  let customer = db.prepare('SELECT * FROM customers WHERE wechat_id = ?').get(data.customerWechatId);
-  if (!customer) {
-    const stmt = db.prepare('INSERT INTO customers (wechat_id, wechat_name, wechat_avatar) VALUES (?, ?, ?)');
-    const info = stmt.run(data.customerWechatId, data.customerWechatName || '', data.customerWechatAvatar || '');
-    customer = { id: info.lastInsertRowid, wechat_id: data.customerWechatId };
-  }
-
-  // 根据角色创建订单
-  const status = data.role === 'worker' ? 'accepted' : 'pending';
+function createPet(data) {
   const stmt = db.prepare(`
-    INSERT INTO orders (date, address, latitude, longitude, customer_id, customer_wechat_id, customer_wechat_name, worker_wechat_id, remark, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO pets (id, name, type, breed, gender, birthday, weight, avatar, user_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const info = stmt.run(
-    data.date,
-    data.address,
-    data.latitude ?? null,
-    data.longitude ?? null,
-    customer.id,
-    data.customerWechatId,
-    data.customerWechatName || '',
-    data.workerWechatId || '',
-    data.remark || '',
-    status
+    data.id || Date.now().toString(),
+    data.name,
+    data.type,
+    data.breed || '',
+    data.gender || '',
+    data.birthday || '',
+    data.weight || 0,
+    data.avatar || '',
+    data.userId
   );
-  return getOrderById(info.lastInsertRowid);
+  return getPetById(data.id || info.lastInsertRowid.toString());
 }
 
-function acceptOrder(orderId, workerId) {
-  const stmt = db.prepare('UPDATE orders SET status = ?, worker_id = ?, updated_at = datetime(\'now\',\'localtime\') WHERE id = ? AND status = ?');
-  const info = stmt.run('accepted', workerId, orderId, 'pending');
-  return info.changes === 1 ? getOrderById(orderId) : null;
-}
-
-function completeOrder(orderId, mediaList) {
-  const order = getOrderById(orderId);
-  if (!order || order.status !== 'accepted') return null;
-  db.prepare('UPDATE orders SET status = ?, updated_at = datetime(\'now\',\'localtime\') WHERE id = ?').run('completed', orderId);
-  const insertMedia = db.prepare('INSERT INTO order_media (order_id, url, type) VALUES (?, ?, ?)');
-  for (const m of mediaList || []) {
-    insertMedia.run(orderId, m.url, m.type || 'image');
-  }
-  return getOrderById(orderId);
-}
-
-function addOrderMedia(orderId, url, type) {
-  db.prepare('INSERT INTO order_media (order_id, url, type) VALUES (?, ?, ?)').run(orderId, url, type || 'image');
-}
-
-// Customers
-function rowToCustomer(row) {
-  if (!row) return null;
-  return {
-    id: row.id,
-    wechatId: row.wechat_id,
-    wechatName: row.wechat_name,
-    wechatAvatar: row.wechat_avatar,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
-  };
-}
-
-function getOrCreateCustomer(wechatId, wechatName, wechatAvatar) {
-  let customer = db.prepare('SELECT * FROM customers WHERE wechat_id = ?').get(wechatId);
-  if (!customer) {
-    const stmt = db.prepare('INSERT INTO customers (wechat_id, wechat_name, wechat_avatar) VALUES (?, ?, ?)');
-    const info = stmt.run(wechatId, wechatName || '', wechatAvatar || '');
-    customer = { id: info.lastInsertRowid, wechat_id: wechatId };
-  }
-  return rowToCustomer(customer);
-}
-
-// Workers
-function rowToWorker(row) {
-  if (!row) return null;
-  return {
-    id: row.id,
-    wechatId: row.wechat_id,
-    wechatName: row.wechat_name,
-    wechatAvatar: row.wechat_avatar,
-    address: row.address,
-    latitude: row.latitude,
-    longitude: row.longitude,
-    serviceStatus: row.service_status,
-    lastUpdateTime: row.last_update_time,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
-  };
-}
-
-function createWorker(data) {
-  const now = Date.now();
-  const stmt = db.prepare(`
-    INSERT INTO workers (wechat_id, wechat_name, wechat_avatar, address, latitude, longitude, service_status, last_update_time)
-    VALUES (?, ?, ?, ?, ?, ?, 'offline', ?)
-  `);
-  const info = stmt.run(
-    data.wechatId,
-    data.wechatName || '',
-    data.wechatAvatar || '',
-    data.address,
-    data.latitude,
-    data.longitude,
-    now
-  );
-  return getWorkerById(info.lastInsertRowid);
-}
-
-function updateWorker(id, data) {
-  const now = Date.now();
+function updatePet(id, data) {
   const fields = [];
   const params = [];
 
-  if (data.wechatId !== undefined) {
-    fields.push('wechat_id = ?');
-    params.push(data.wechatId);
+  if (data.name !== undefined) {
+    fields.push('name = ?');
+    params.push(data.name);
   }
-  if (data.wechatName !== undefined) {
-    fields.push('wechat_name = ?');
-    params.push(data.wechatName);
+  if (data.type !== undefined) {
+    fields.push('type = ?');
+    params.push(data.type);
   }
-  if (data.wechatAvatar !== undefined) {
-    fields.push('wechat_avatar = ?');
-    params.push(data.wechatAvatar);
+  if (data.breed !== undefined) {
+    fields.push('breed = ?');
+    params.push(data.breed);
   }
-  if (data.address !== undefined) {
-    fields.push('address = ?');
-    params.push(data.address);
+  if (data.gender !== undefined) {
+    fields.push('gender = ?');
+    params.push(data.gender);
   }
-  if (data.latitude !== undefined) {
-    fields.push('latitude = ?');
-    params.push(data.latitude);
+  if (data.birthday !== undefined) {
+    fields.push('birthday = ?');
+    params.push(data.birthday);
   }
-  if (data.longitude !== undefined) {
-    fields.push('longitude = ?');
-    params.push(data.longitude);
+  if (data.weight !== undefined) {
+    fields.push('weight = ?');
+    params.push(data.weight);
   }
-  if (data.serviceStatus !== undefined) {
-    fields.push('service_status = ?');
-    params.push(data.serviceStatus);
+  if (data.avatar !== undefined) {
+    fields.push('avatar = ?');
+    params.push(data.avatar);
   }
 
-  fields.push('last_update_time = ?');
-  params.push(now);
   fields.push('updated_at = datetime(\'now\',\'localtime\')');
   params.push(id);
 
   if (fields.length > 0) {
-    const sql = `UPDATE workers SET ${fields.join(', ')} WHERE id = ?`;
+    const sql = `UPDATE pets SET ${fields.join(', ')} WHERE id = ?`;
     db.prepare(sql).run(...params);
   }
 
-  return getWorkerById(id);
+  return getPetById(id);
 }
 
-function getWorkerById(id) {
-  const row = db.prepare('SELECT * FROM workers WHERE id = ?').get(id);
-  return rowToWorker(row);
+function deletePet(id) {
+  return db.prepare('DELETE FROM pets WHERE id = ?').run(id);
 }
 
-function getWorkerByWechatId(wechatId) {
-  const row = db.prepare('SELECT * FROM workers WHERE wechat_id = ?').get(wechatId);
-  return rowToWorker(row);
+// 记录相关函数
+function rowToRecord(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    petId: row.pet_id,
+    type: row.type,
+    date: row.date,
+    remark: row.remark,
+    images: row.images ? JSON.parse(row.images) : [],
+    weight: row.weight,
+    nextReminder: row.next_reminder,
+    userId: row.user_id,
+    createTime: row.created_at,
+    updateTime: row.updated_at
+  };
+}
+
+function getRecords(filters = {}) {
+  const { petId, type, startDate, endDate, userId, limit = 100 } = filters;
+  let sql = 'SELECT * FROM records WHERE 1=1';
+  const params = [];
+
+  if (petId) {
+    sql += ' AND pet_id = ?';
+    params.push(petId);
+  }
+  if (type) {
+    sql += ' AND type = ?';
+    params.push(type);
+  }
+  if (startDate) {
+    sql += ' AND date >= ?';
+    params.push(startDate);
+  }
+  if (endDate) {
+    sql += ' AND date <= ?';
+    params.push(endDate);
+  }
+  if (userId) {
+    sql += ' AND user_id = ?';
+    params.push(userId);
+  }
+
+  sql += ' ORDER BY date DESC LIMIT ?';
+  params.push(limit);
+
+  const rows = db.prepare(sql).all(...params);
+  return rows.map(rowToRecord);
+}
+
+function getRecordById(id) {
+  const row = db.prepare('SELECT * FROM records WHERE id = ?').get(id);
+  return rowToRecord(row);
+}
+
+function createRecord(data) {
+  const stmt = db.prepare(`
+    INSERT INTO records (id, pet_id, type, date, remark, images, weight, next_reminder, user_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const info = stmt.run(
+    data.id || Date.now().toString(),
+    data.petId,
+    data.type,
+    data.date,
+    data.remark || '',
+    JSON.stringify(data.images || []),
+    data.weight || 0,
+    data.nextReminder || '',
+    data.userId
+  );
+  return getRecordById(data.id || info.lastInsertRowid.toString());
+}
+
+function updateRecord(id, data) {
+  const fields = [];
+  const params = [];
+
+  if (data.type !== undefined) {
+    fields.push('type = ?');
+    params.push(data.type);
+  }
+  if (data.date !== undefined) {
+    fields.push('date = ?');
+    params.push(data.date);
+  }
+  if (data.remark !== undefined) {
+    fields.push('remark = ?');
+    params.push(data.remark);
+  }
+  if (data.images !== undefined) {
+    fields.push('images = ?');
+    params.push(JSON.stringify(data.images));
+  }
+  if (data.weight !== undefined) {
+    fields.push('weight = ?');
+    params.push(data.weight);
+  }
+
+  fields.push('updated_at = datetime(\'now\',\'localtime\')');
+  params.push(id);
+
+  if (fields.length > 0) {
+    const sql = `UPDATE records SET ${fields.join(', ')} WHERE id = ?`;
+    db.prepare(sql).run(...params);
+  }
+
+  return getRecordById(id);
+}
+
+function deleteRecord(id) {
+  return db.prepare('DELETE FROM records WHERE id = ?').run(id);
+}
+
+function getRecordStatistics(userId) {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+  const rows = db.prepare(`
+    SELECT type, COUNT(*) as count
+    FROM records
+    WHERE user_id = ? AND date >= ?
+    GROUP BY type
+  `).all(userId, monthStart);
+
+  return rows.map(r => ({
+    type: r.type,
+    count: r.count
+  }));
+}
+
+// 提醒相关函数
+function rowToReminder(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    petId: row.pet_id,
+    type: row.type,
+    title: row.title,
+    targetDate: row.target_date,
+    status: row.status,
+    userId: row.user_id,
+    createTime: row.created_at,
+    updateTime: row.updated_at
+  };
+}
+
+function getReminders(filters = {}) {
+  const { petId, userId, status } = filters;
+  let sql = 'SELECT * FROM reminders WHERE 1=1';
+  const params = [];
+
+  if (petId) {
+    sql += ' AND pet_id = ?';
+    params.push(petId);
+  }
+  if (userId) {
+    sql += ' AND user_id = ?';
+    params.push(userId);
+  }
+  if (status) {
+    sql += ' AND status = ?';
+    params.push(status);
+  }
+
+  sql += ' ORDER BY target_date ASC';
+
+  const rows = db.prepare(sql).all(...params);
+  return rows.map(rowToReminder);
+}
+
+function getReminderById(id) {
+  const row = db.prepare('SELECT * FROM reminders WHERE id = ?').get(id);
+  return rowToReminder(row);
+}
+
+function createReminder(data) {
+  const stmt = db.prepare(`
+    INSERT INTO reminders (id, pet_id, type, title, target_date, status, user_id)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  const info = stmt.run(
+    data.id || Date.now().toString(),
+    data.petId,
+    data.type,
+    data.title,
+    data.targetDate,
+    data.status || 'pending',
+    data.userId
+  );
+  return getReminderById(data.id || info.lastInsertRowid.toString());
+}
+
+function updateReminder(id, data) {
+  const fields = [];
+  const params = [];
+
+  if (data.status !== undefined) {
+    fields.push('status = ?');
+    params.push(data.status);
+  }
+  if (data.targetDate !== undefined) {
+    fields.push('target_date = ?');
+    params.push(data.targetDate);
+  }
+
+  fields.push('updated_at = datetime(\'now\',\'localtime\')');
+  params.push(id);
+
+  if (fields.length > 0) {
+    const sql = `UPDATE reminders SET ${fields.join(', ')} WHERE id = ?`;
+    db.prepare(sql).run(...params);
+  }
+
+  return getReminderById(id);
+}
+
+function deleteReminder(id) {
+  return db.prepare('DELETE FROM reminders WHERE id = ?').run(id);
+}
+
+// 用户相关函数
+function rowToUser(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    openid: row.openid,
+    nickname: row.nickname,
+    avatar: row.avatar,
+    createTime: row.created_at,
+    updateTime: row.updated_at
+  };
+}
+
+function getOrCreateUser(openid, nickname, avatar) {
+  let user = db.prepare('SELECT * FROM users WHERE openid = ?').get(openid);
+  if (!user) {
+    const stmt = db.prepare('INSERT INTO users (id, openid, nickname, avatar) VALUES (?, ?, ?, ?)');
+    const userId = Date.now().toString();
+    const info = stmt.run(userId, openid, nickname || '', avatar || '');
+    user = { id: userId, openid };
+  }
+  return rowToUser(user);
 }
 
 module.exports = {
   db,
   initSchema,
-  getOrders,
-  getOrderById,
-  createOrder,
-  acceptOrder,
-  completeOrder,
-  addOrderMedia,
-  createWorker,
-  updateWorker,
-  getWorkerById,
-  getWorkerByWechatId,
-  rowToCustomer,
-  getOrCreateCustomer
+  // 宠物
+  getPets,
+  getPetById,
+  createPet,
+  updatePet,
+  deletePet,
+  // 记录
+  getRecords,
+  getRecordById,
+  createRecord,
+  updateRecord,
+  deleteRecord,
+  getRecordStatistics,
+  // 提醒
+  getReminders,
+  getReminderById,
+  createReminder,
+  updateReminder,
+  deleteReminder,
+  // 用户
+  rowToUser,
+  getOrCreateUser
 };

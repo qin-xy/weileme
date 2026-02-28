@@ -3,48 +3,60 @@
 		{
 			"path": "pages/index/index",
 			"style": {
-				"navigationBarTitleText": "喂了么-首页"
+				"navigationBarTitleText": "萌宠日记"
 			}
 		},
 		{
-			"path": "pages/order/create",
+			"path": "pages/pet/add",
 			"style": {
-				"navigationBarTitleText": "宠物上门服务下单"
+				"navigationBarTitleText": "添加宠物"
 			}
 		},
 		{
-			"path": "pages/worker/register",
+			"path": "pages/pet/detail",
 			"style": {
-				"navigationBarTitleText": "上门人登记"
+				"navigationBarTitleText": "宠物详情"
 			}
 		},
 		{
-			"path": "pages/worker/orders",
+			"path": "pages/record/add",
 			"style": {
-				"navigationBarTitleText": "任务中心"
+				"navigationBarTitleText": "添加记录"
 			}
 		},
 		{
-			"path": "pages/worker/upload",
+			"path": "pages/record/list",
 			"style": {
-				"navigationBarTitleText": "服务过程记录"
+				"navigationBarTitleText": "历史记录"
+			}
+		},
+		{
+			"path": "pages/record/statistics",
+			"style": {
+				"navigationBarTitleText": "统计数据"
+			}
+		},
+		{
+			"path": "pages/reminder/index",
+			"style": {
+				"navigationBarTitleText": "提醒设置"
 			}
 		}
 	],
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
-		"navigationBarTitleText": "喂了么",
+		"navigationBarTitleText": "萌宠日记",
 		"navigationBarBackgroundColor": "#F8F8F8",
 		"backgroundColor": "#F8F8F8"
 	},
 	"uniIdRouter": {},
-	"condition" : { //模式配置，仅开发期间生效
-		"current": 0, //当前激活的模式(list 的索引项)
+	"condition" : {
+		"current": 0,
 		"list": [
 			{
-				"name": "", //模式名称
-				"path": "", //启动页面，必选
-				"query": "" //启动参数，在页面的onLoad函数里面得到
+				"name": "",
+				"path": "",
+				"query": ""
 			}
 		]
 	}

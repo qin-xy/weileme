@@ -6,8 +6,10 @@ const path = require('path');
 const db = require('./db');
 db.initSchema();
 
-const ordersRouter = require('./routes/orders');
-const workersRouter = require('./routes/workers');
+const petsRouter = require('./routes/pets');
+const recordsRouter = require('./routes/records');
+const remindersRouter = require('./routes/reminders');
+const uploadRouter = require('./routes/upload');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,20 +17,25 @@ const PORT = process.env.PORT || 3000;
 const corsOrigin = process.env.CORS_ORIGIN || '*';
 app.use(cors({ origin: corsOrigin }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // 静态访问上传目录
 const uploadDir = process.env.UPLOAD_DIR || 'uploads';
 app.use('/' + uploadDir, express.static(path.join(__dirname, uploadDir)));
 
-app.use('/api/orders', ordersRouter);
-app.use('/api/workers', workersRouter);
+// 注册路由
+app.use('/api/pets', petsRouter);
+app.use('/api/records', recordsRouter);
+app.use('/api/reminders', remindersRouter);
+app.use('/api/upload', uploadRouter);
 
+// 健康检查
 app.get('/api/health', (req, res) => {
-  res.json({ code: 0, message: 'ok', service: 'weileme-server' });
+  res.json({ code: 0, message: 'ok', service: 'mengchongriji-server' });
 });
 
+// 错误处理
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ code: 500, message: err.message || '服务器错误' });
@@ -36,9 +43,11 @@ app.use((err, req, res, next) => {
 
 function startServer(port) {
   const server = app.listen(port, () => {
-    console.log('喂了么后台服务已启动: http://localhost:' + port);
-    console.log('  - 订单: GET/POST /api/orders, GET/PATCH /api/orders/:id, PATCH /api/orders/:id/accept, PATCH /api/orders/:id/complete, POST /api/orders/:id/media');
-    console.log('  - 上门人: GET/POST /api/workers, GET/PUT /api/workers/:id');
+    console.log('萌宠日记后台服务已启动: http://localhost:' + port);
+    console.log('  - 宠物: GET/POST/PUT/DELETE /api/pets');
+    console.log('  - 记录: GET/POST/PUT/DELETE /api/records, GET /api/records/statistics');
+    console.log('  - 提醒: GET/POST/PUT/DELETE /api/reminders');
+    console.log('  - 上传: POST /api/upload');
   });
 
   server.on('error', (err) => {

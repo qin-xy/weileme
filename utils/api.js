@@ -1,5 +1,5 @@
 /**
- * 喂了么后台 API 封装（与 server 配套）
+ * 萌宠日记后台 API 封装
  * 仅当 utils/config.js 中 BASE_URL 有值时使用；否则页面仍用本地存储
  */
 import { BASE_URL } from './config.js';
@@ -22,43 +22,88 @@ function request(options) {
   });
 }
 
-// 订单
-export function createOrder(body) {
-  // 添加角色信息
-  const data = {
-    ...body,
-    role: body.role || 'client',
-    customerWechatName: body.customerWechatName || '',
-    customerWechatAvatar: body.customerWechatAvatar || '',
-    workerWechatId: body.workerWechatId || ''
-  };
-  return request({ method: 'POST', url: '/api/orders', data });
+// 宠物管理
+export function getPets(userId) {
+  return request({ method: 'GET', url: '/api/pets', data: { userId } });
 }
 
-export function getOrders(params = {}) {
-  const parts = [];
-  Object.keys(params).forEach(k => { if (params[k] !== undefined && params[k] !== '') parts.push(k + '=' + encodeURIComponent(params[k])); });
-  const q = parts.length ? '?' + parts.join('&') : '';
-  return request({ method: 'GET', url: '/api/orders' + q });
+export function getPetById(id) {
+  return request({ method: 'GET', url: `/api/pets/${id}` });
 }
 
-export function getOrderById(id) {
-  return request({ method: 'GET', url: '/api/orders/' + id });
+export function createPet(data) {
+  return request({ method: 'POST', url: '/api/pets', data });
 }
 
-export function acceptOrder(orderId, workerId) {
-  return request({ method: 'PATCH', url: '/api/orders/' + orderId + '/accept', data: { workerId } });
+export function updatePet(id, data) {
+  return request({ method: 'PUT', url: `/api/pets/${id}`, data });
 }
 
-export function completeOrder(orderId, media = []) {
-  return request({ method: 'PATCH', url: '/api/orders/' + orderId + '/complete', data: { media } });
+export function deletePet(id) {
+  return request({ method: 'DELETE', url: `/api/pets/${id}` });
 }
 
-// 上传单张图片/视频（可多次调用）
-export function uploadOrderMedia(orderId, filePath, type = 'image') {
+// 行为记录管理
+export function getRecords(params = {}) {
+  const query = Object.keys(params)
+    .filter(k => params[k] !== undefined && params[k] !== '')
+    .map(k => `${k}=${encodeURIComponent(params[k])}`)
+    .join('&');
+  const url = query ? `/api/records?${query}` : '/api/records';
+  return request({ method: 'GET', url });
+}
+
+export function getRecordById(id) {
+  return request({ method: 'GET', url: `/api/records/${id}` });
+}
+
+export function createRecord(data) {
+  return request({ method: 'POST', url: '/api/records', data });
+}
+
+export function updateRecord(id, data) {
+  return request({ method: 'PUT', url: `/api/records/${id}`, data });
+}
+
+export function deleteRecord(id) {
+  return request({ method: 'DELETE', url: `/api/records/${id}` });
+}
+
+export function getRecordStatistics(userId) {
+  return request({ method: 'GET', url: `/api/records/statistics?userId=${userId}` });
+}
+
+// 提醒管理
+export function getReminders(params = {}) {
+  const query = Object.keys(params)
+    .filter(k => params[k] !== undefined && params[k] !== '')
+    .map(k => `${k}=${encodeURIComponent(params[k])}`)
+    .join('&');
+  const url = query ? `/api/reminders?${query}` : '/api/reminders';
+  return request({ method: 'GET', url });
+}
+
+export function getReminderById(id) {
+  return request({ method: 'GET', url: `/api/reminders/${id}` });
+}
+
+export function createReminder(data) {
+  return request({ method: 'POST', url: '/api/reminders', data });
+}
+
+export function updateReminder(id, data) {
+  return request({ method: 'PUT', url: `/api/reminders/${id}`, data });
+}
+
+export function deleteReminder(id) {
+  return request({ method: 'DELETE', url: `/api/reminders/${id}` });
+}
+
+// 图片上传
+export function uploadImage(filePath) {
   return new Promise((resolve, reject) => {
     uni.uploadFile({
-      url: BASE_URL + '/api/orders/' + orderId + '/media',
+      url: BASE_URL + '/api/upload',
       filePath,
       name: 'file',
       success: (res) => {
@@ -73,25 +118,4 @@ export function uploadOrderMedia(orderId, filePath, type = 'image') {
       fail: reject
     });
   });
-}
-
-// 上门人
-export function registerWorker(body) {
-  return request({ method: 'POST', url: '/api/workers', data: body });
-}
-
-export function updateWorker(id, body) {
-  return request({ method: 'PUT', url: '/api/workers/' + id, data: body });
-}
-
-export function getWorkerById(id) {
-  return request({ method: 'GET', url: '/api/workers/' + id });
-}
-
-export function getWorkerByWechatId(wechatId) {
-  return request({ method: 'GET', url: '/api/workers/wechat/' + wechatId });
-}
-
-export function updateWorkerStatus(id, status) {
-  return request({ method: 'PATCH', url: '/api/workers/' + id + '/status', data: { serviceStatus: status } });
 }

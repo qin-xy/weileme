@@ -1,84 +1,62 @@
-# 喂了么后台服务 (weileme-server)
+# 萌宠日记 - 后端服务 (mengchongriji-server)
 
-与 uniapp 前端配套的 Node.js + Express + SQLite 后台，提供订单与上门人 API。
+一个基于 Node.js + Express + SQLite 的轻量级宠物日记后台，支持宠物档案管理、行为记录、统计与提醒功能。
 
-## 环境要求
+## 🌟 核心特性
 
-- Node.js 16+
-- npm 或 yarn
+- **多端兼容**：提供标准 RESTful API，完美适配 uni-app。
+- **自动初始化**：首次启动会自动创建 SQLite 数据库及其表结构。
+- **静态资源托管**：自动处理宠物头像、记录图片的静态访问。
+- **健康监控**：提供 API 健康检查接口。
 
-## 快速启动
+## 🚀 快速启动
 
 ```bash
 cd server
 npm install
-cp .env.example .env   # 可选，修改端口、CORS、上传目录等
+# 修改 .env 配置文件（可选）
 npm start
 ```
+默认服务端口：`3000`。
 
-服务默认运行在 `http://localhost:3000`。首次启动会自动创建 `data/weileme.db` 及表结构。
+## 📋 核心 API
 
-## 数据库说明
+### 1. 宠物管理 (Pets)
+- `GET /api/pets?userId=xxx` - 获取宠物列表
+- `GET /api/pets/:id` - 获取宠物详情
+- `POST /api/pets` - 新增宠物
+- `PUT /api/pets/:id` - 更新宠物信息
+- `DELETE /api/pets/:id` - 删除宠物档案
 
-- **SQLite** 文件：`server/data/weileme.db`
-- **表结构**：
-  - **workers**：上门人（id, address, latitude, longitude, last_update_time, created_at, updated_at）
-  - **orders**：订单（id, date, address, latitude, longitude, wechat_id, remark, status, worker_id, created_at, updated_at）
-  - **order_media**：服务过程媒体（id, order_id, url, type, created_at）
-- **订单状态**：`pending`（待接单）→ `accepted`（待上门）→ `completed`（服务完成）
+### 2. 行为记录 (Records)
+- `GET /api/records?petId=xxx&userId=xxx` - 获取行为记录列表（按日期倒序）
+- `POST /api/records` - 添加行为记录（支持多图、备注、体重、下次提醒日期）
+- `GET /api/records/statistics?userId=xxx` - 获取当月各类型行为次数统计
 
-手动初始化表（可选）：`npm run init-db`  
-数据库维护（备份、恢复、查看、重置）：见 [docs/数据库维护.md](docs/数据库维护.md)。常用命令：`npm run backup-db`、`npm run reset-db`（慎用，会清空数据）。
+### 3. 待办提醒 (Reminders)
+- `GET /api/reminders?userId=xxx&status=pending` - 获取未处理提醒
+- `POST /api/reminders` - 创建新提醒
+- `PUT /api/reminders/:id` - 更新提醒状态（如：标记为已完成）
+- `DELETE /api/reminders/:id` - 移除提醒
 
-## API 列表
+### 4. 文件上传 (Upload)
+- `POST /api/upload` - 通用上传接口，上传后返回公网 URL。
 
-Base URL: `http://localhost:3000`（或你配置的 `PORT`）
+## 💾 数据库设计
 
-### 健康检查
+本项目使用 **SQLite**，数据库文件位于 `data/weileme.db`。核心表包括：
+- `pets`: 存储名字、品种、性别、生日、体重、头像等档案信息。
+- `records`: 存储喂食、遛弯、就医等全量行为数据及备注。
+- `reminders`: 记录待办事项。
+- `users`: 管理用户唯一标识及基础信息。
 
-- `GET /api/health` — 返回 `{ code: 0, message: 'ok' }`
+## ⚙️ 环境配置 (.env)
 
-### 订单
+| 变量名 | 说明 | 默认值 |
+| :--- | :--- | :--- |
+| PORT | 服务监听端口 | 3000 |
+| CORS_ORIGIN | 允许跨域来源 | * |
+| UPLOAD_DIR | 图片/文件上传目录 | uploads |
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | /api/orders | 创建订单。Body: `{ date, address, latitude?, longitude?, wechatId, remark? }` |
-| GET | /api/orders | 列表。Query: `status`, `wechatId`（我的订单）, `workerId`（我的任务）, `limit`, `offset` |
-| GET | /api/orders/:id | 订单详情 |
-| PATCH | /api/orders/:id/accept | 接单。Body: `{ workerId }` |
-| POST | /api/orders/:id/media | 上传服务过程图片/视频。FormData: `file` |
-| PATCH | /api/orders/:id/complete | 完成服务。Body: `{ media?: [{ url, type }] }` 可选 |
-
-### 上门人
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | /api/workers | 登记（新建）。Body: `{ address?, latitude, longitude }` |
-| PUT | /api/workers/:id | 更新位置。Body: `{ address?, latitude, longitude }` |
-| GET | /api/workers/:id | 上门人详情 |
-
-响应格式统一：`{ code: 0, data: ... }` 或 `{ code: 4xx/5xx, message: '...' }`。
-
-## 环境变量（.env）
-
-| 变量 | 说明 | 默认 |
-|------|------|------|
-| PORT | 服务端口 | 3000 |
-| CORS_ORIGIN | 允许的跨域来源，多个逗号分隔，`*` 表示全部 | * |
-| UPLOAD_DIR | 上传文件目录（相对 server） | uploads |
-| BASE_URL | 访问地址（用于返回媒体 URL） | http://localhost:3000 |
-
-## 前端对接说明
-
-1. 在前端配置接口基础地址（如 `utils/config.js` 中 `BASE_URL = 'http://localhost:3000'` 或你的服务器地址）。
-2. 将原先 `uni.getStorageSync('orders')` / `uni.setStorageSync('orders', ...)` 改为请求：
-   - 客户「我的订单」：`GET /api/orders?wechatId=xxx&limit=3`
-   - 下单：`POST /api/orders`
-3. 上门人：
-   - 登记：`POST /api/workers`，把返回的 `data.id` 与 address/latitude/longitude 一起存为 `worker_info`（含 `id`）。
-   - 任务中心待接单：`GET /api/orders?status=pending`
-   - 我的任务：`GET /api/orders?workerId=当前worker_info.id`
-   - 接单：`PATCH /api/orders/:id/accept` Body `{ workerId }`
-   - 完成服务：先 `POST /api/orders/:id/media` 上传图片/视频，再 `PATCH /api/orders/:id/complete`。
-
-前端已提供 `utils/api.js` 和 `utils/config.js`，可在页面中按需改为调用 api 方法。
+---
+萌宠日记，记录每一刻的温馨。
