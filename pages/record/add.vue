@@ -90,6 +90,10 @@
 </template>
 
 <script>
+	import { getPets, createRecord, createReminder, uploadImage } from '../../utils/api.js';
+	import { BASE_URL } from '../../utils/config.js';
+	import { getUserId } from '../../utils/user.js';
+
 	export default {
 		data() {
 			return {
@@ -132,18 +136,12 @@
 				return this.pets.map(p => p.name);
 			}
 		},
-		onLoad(options) {
+		async onLoad(options) {
 			// 初始化日期时间范围
 			this.initDateTimeRange();
 
 			// 加载宠物列表
-			this.pets = uni.getStorageSync('pets') || [];
-
-			// 如果有预选宠物ID
-			if (options.petId) {
-				this.record.petId = options.petId;
-				this.petIndex = this.pets.findIndex(p => p.id === options.petId);
-			}
+			await this.loadPets(options);
 
 			// 如果有预选类型
 			if (options.type) {
@@ -155,6 +153,21 @@
 			this.record.date = this.formatDateTime(now);
 		},
 		methods: {
+			async loadPets(options) {
+				try {
+					const userId = await getUserId();
+					const pets = await getPets(userId);
+					this.pets = pets || [];
+
+					if (options.petId) {
+						this.record.petId = options.petId;
+						this.petIndex = this.pets.findIndex(p => p.id === options.petId);
+					}
+				} catch (error) {
+					this.pets = [];
+					uni.showToast({ title: error.message || '加载宠物失败', icon: 'none' });
+				}
+			},
 			initDateTimeRange() {
 				// 生成最近7天的日期
 				const dates = [];
@@ -266,7 +279,7 @@
 				return icons[type] || '🐾';
 			},
 
-			saveRecord() {
+			async saveRecord() {
 				// 表单验证
 				if (!this.record.petId) {
 					uni.showToast({ title: '请选择宠物', icon: 'none' });
@@ -283,49 +296,58 @@
 					return;
 				}
 
-				// 构建记录数据
-				const newRecord = {
-					id: Date.now().toString(),
-					petId: this.record.petId,
-					type: this.record.type,
-					date: this.record.date,
-					remark: this.record.remark.trim(),
-					images: this.record.images,
-					nextReminder: this.record.nextReminder,
-					createTime: new Date().toISOString()
-				};
+				try {
+					uni.showLoading({ title: '保存中...' });
+					const userId = await getUserId();
+					const images = await this.uploadImages(this.record.images);
 
-				// 保存记录
-				let records = uni.getStorageSync('records') || [];
-				records.unshift(newRecord);
-				uni.setStorageSync('records', records);
-
-				// 如果有提醒，保存提醒信息
-				if (this.showReminder && this.record.nextReminder) {
-					const newReminder = {
-						id: Date.now().toString(),
+					await createRecord({
+						userId,
 						petId: this.record.petId,
 						type: this.record.type,
-						title: this.getReminderTitle(this.record.type),
-						targetDate: this.record.nextReminder,
-						status: 'pending',
-						createTime: new Date().toISOString()
-					};
+						date: this.record.date,
+						remark: this.record.remark.trim(),
+						images,
+						nextReminder: this.record.nextReminder
+					});
 
-					let reminders = uni.getStorageSync('reminders') || [];
-					reminders.unshift(newReminder);
-					uni.setStorageSync('reminders', reminders);
-				}
-
-				uni.showToast({
-					title: '保存成功',
-					icon: 'success',
-					success: () => {
-						setTimeout(() => {
-							uni.navigateBack();
-						}, 1500);
+					if (this.showReminder && this.record.nextReminder) {
+						await createReminder({
+							userId,
+							petId: this.record.petId,
+							type: this.record.type,
+							title: this.getReminderTitle(this.record.type),
+							targetDate: this.record.nextReminder,
+							status: 'pending'
+						});
 					}
+
+					uni.hideLoading();
+					uni.showToast({
+						title: '保存成功',
+						icon: 'success',
+						success: () => {
+							setTimeout(() => {
+								uni.navigateBack();
+							}, 1500);
+						}
+					});
+				} catch (error) {
+					uni.hideLoading();
+					uni.showToast({ title: error.message || '保存失败', icon: 'none' });
+				}
+			},
+
+			async uploadImages(images = []) {
+				const tasks = images.map(async (imagePath) => {
+					if (!imagePath) return '';
+					if (/^https?:\/\//.test(imagePath)) return imagePath;
+					const result = await uploadImage(imagePath);
+					if (result.url) return `${BASE_URL}${result.url}`;
+					return result.path || imagePath;
 				});
+				const uploaded = await Promise.all(tasks);
+				return uploaded.filter(item => item);
 			},
 
 			getReminderTitle(type) {
@@ -454,7 +476,7 @@
 	}
 
 	.picker-input.placeholder {
-		color: #999;
+		color: #7a7a7a;
 	}
 
 	/* 行为类型选择 */
@@ -509,7 +531,7 @@
 	}
 
 	.placeholder {
-		color: #999;
+		color: #7a7a7a;
 	}
 
 	/* 图片上传 */

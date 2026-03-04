@@ -74,6 +74,10 @@
 </template>
 
 <script>
+	import { createPet, uploadImage } from '../../utils/api.js';
+	import { BASE_URL } from '../../utils/config.js';
+	import { getUserId } from '../../utils/user.js';
+
 	export default {
 		data() {
 			return {
@@ -113,7 +117,7 @@
 				});
 			},
 
-			savePet() {
+			async savePet() {
 				// 表单验证
 				if (!this.pet.name.trim()) {
 					uni.showToast({ title: '请输入宠物名字', icon: 'none' });
@@ -125,33 +129,44 @@
 					return;
 				}
 
-				// 构建宠物数据
-				const newPet = {
-					id: Date.now().toString(),
-					name: this.pet.name.trim(),
-					type: this.pet.type,
-					breed: this.pet.breed.trim(),
-					gender: this.pet.gender,
-					birthday: this.pet.birthday,
-					weight: this.pet.weight,
-					avatar: this.avatar,
-					createTime: new Date().toISOString()
-				};
+				try {
+					uni.showLoading({ title: '保存中...' });
+					const userId = await getUserId();
+					const avatar = await this.uploadAvatar(this.avatar);
 
-				// 保存到本地存储
-				let pets = uni.getStorageSync('pets') || [];
-				pets.push(newPet);
-				uni.setStorageSync('pets', pets);
+					await createPet({
+						userId,
+						name: this.pet.name.trim(),
+						type: this.pet.type,
+						breed: this.pet.breed.trim(),
+						gender: this.pet.gender,
+						birthday: this.pet.birthday,
+						weight: this.pet.weight,
+						avatar
+					});
 
-				uni.showToast({
-					title: '保存成功',
-					icon: 'success',
-					success: () => {
-						setTimeout(() => {
-							uni.navigateBack();
-						}, 1500);
-					}
-				});
+					uni.hideLoading();
+					uni.showToast({
+						title: '保存成功',
+						icon: 'success',
+						success: () => {
+							setTimeout(() => {
+								uni.navigateBack();
+							}, 1500);
+						}
+					});
+				} catch (error) {
+					uni.hideLoading();
+					uni.showToast({ title: error.message || '保存失败', icon: 'none' });
+				}
+			},
+
+			async uploadAvatar(avatarPath) {
+				if (!avatarPath) return '';
+				if (/^https?:\/\//.test(avatarPath)) return avatarPath;
+				const result = await uploadImage(avatarPath);
+				if (result.url) return `${BASE_URL}${result.url}`;
+				return result.path || avatarPath;
 			}
 		}
 	}
@@ -258,6 +273,13 @@
 		color: #333;
 		border: 2rpx solid transparent;
 		transition: all 0.3s;
+		box-sizing: border-box;
+	}
+
+	.input {
+		height: 88rpx;
+		line-height: 88rpx;
+		padding: 0 28rpx;
 	}
 
 	.input:focus {
@@ -276,11 +298,11 @@
 	}
 
 	.picker-input.placeholder {
-		color: #999;
+		color: #7a7a7a;
 	}
 
 	.placeholder {
-		color: #999;
+		color: #7a7a7a;
 	}
 
 	/* 性别选择 */

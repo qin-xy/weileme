@@ -95,6 +95,9 @@
 </template>
 
 <script>
+	import { getPets, getRecords, getReminders } from '../../utils/api.js';
+	import { getUserId } from '../../utils/user.js';
+
 	export default {
 		data() {
 			return {
@@ -145,20 +148,30 @@
 			}
 		},
 		methods: {
-			loadData() {
-				// 从本地存储加载宠物数据
-				this.pets = uni.getStorageSync('pets') || [];
-				this.upcomingReminders = uni.getStorageSync('reminders') || [];
+			async loadData() {
+				try {
+					const userId = await getUserId();
+					const [pets, reminders, records] = await Promise.all([
+						getPets(userId),
+						getReminders({ userId, status: 'pending' }),
+						getRecords({ userId })
+					]);
 
-				// 为每个宠物加载最新记录
-				const records = uni.getStorageSync('records') || [];
-				this.pets.forEach(pet => {
-					const petRecords = records.filter(r => r.petId === pet.id);
-					if (petRecords.length > 0) {
-						petRecords.sort((a, b) => new Date(b.date) - new Date(a.date));
-						pet.latestRecord = petRecords[0];
-					}
-				});
+					this.pets = pets || [];
+					this.upcomingReminders = reminders || [];
+
+					this.pets.forEach(pet => {
+						const petRecords = (records || []).filter(r => r.petId === pet.id);
+						if (petRecords.length > 0) {
+							petRecords.sort((a, b) => this.parseRecordDate(b.date) - this.parseRecordDate(a.date));
+							pet.latestRecord = petRecords[0];
+						}
+					});
+				} catch (error) {
+					this.pets = [];
+					this.upcomingReminders = [];
+					uni.showToast({ title: error.message || '加载失败', icon: 'none' });
+				}
 			},
 
 			quickRecord(type) {
@@ -236,9 +249,31 @@
 				return icons[type] || '⏰';
 			},
 
-			formatRecordTime(date) {
+			parseRecordDate(dateStr) {
+				if (!dateStr) return new Date(0);
+				const directDate = new Date(dateStr);
+				if (!isNaN(directDate.getTime())) {
+					return directDate;
+				}
+
+				const match = dateStr.match(/^([\d]{1,2})月([\d]{1,2})日\s*([\d]{1,2})?:?([\d]{2})?$/);
+				if (!match) return new Date(0);
+
+				const [, monthStr, dayStr, hourStr, minuteStr] = match;
+				const year = new Date().getFullYear();
+				const month = Number(monthStr) - 1;
+				const day = Number(dayStr);
+				const hour = hourStr ? Number(hourStr) : 0;
+				const minute = minuteStr ? Number(minuteStr) : 0;
+				return new Date(year, month, day, hour, minute);
+			},
+
+			formatRecordTime(dateStr) {
 				const now = new Date();
-				const recordDate = new Date(date);
+				const recordDate = this.parseRecordDate(dateStr);
+				if (isNaN(recordDate.getTime())) {
+					return dateStr || '';
+				}
 				const diffTime = Math.abs(now - recordDate);
 				const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 

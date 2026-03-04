@@ -84,6 +84,9 @@
 </template>
 
 <script>
+	import { getPets, getRecords } from '../../utils/api.js';
+	import { getUserId } from '../../utils/user.js';
+
 	export default {
 		data() {
 			return {
@@ -143,13 +146,20 @@
 			this.loadData();
 		},
 		methods: {
-			loadData() {
-				// 加载宠物列表
-				this.pets = uni.getStorageSync('pets') || [];
-
-				// 加载记录列表
-				const allRecords = uni.getStorageSync('records') || [];
-				this.records = allRecords.sort((a, b) => new Date(b.date) - new Date(a.date));
+			async loadData() {
+				try {
+					const userId = await getUserId();
+					const [pets, records] = await Promise.all([
+						getPets(userId),
+						getRecords({ userId })
+					]);
+					this.pets = pets || [];
+					this.records = (records || []).sort((a, b) => this.parseRecordDate(b.date) - this.parseRecordDate(a.date));
+				} catch (error) {
+					this.pets = [];
+					this.records = [];
+					uni.showToast({ title: error.message || '加载失败', icon: 'none' });
+				}
 			},
 
 			selectPet(petId) {
@@ -205,8 +215,30 @@
 				return names[type] || type;
 			},
 
+			parseRecordDate(dateStr) {
+				if (!dateStr) return new Date(0);
+				const directDate = new Date(dateStr);
+				if (!isNaN(directDate.getTime())) {
+					return directDate;
+				}
+
+				const match = dateStr.match(/^(\d{1,2})月(\d{1,2})日\s*(\d{1,2})?:?(\d{2})?$/);
+				if (!match) return new Date(0);
+
+				const [, monthStr, dayStr, hourStr, minuteStr] = match;
+				const year = new Date().getFullYear();
+				const month = Number(monthStr) - 1;
+				const day = Number(dayStr);
+				const hour = hourStr ? Number(hourStr) : 0;
+				const minute = minuteStr ? Number(minuteStr) : 0;
+				return new Date(year, month, day, hour, minute);
+			},
+
 			formatDateTime(dateStr) {
-				const date = new Date(dateStr);
+				const date = this.parseRecordDate(dateStr);
+				if (isNaN(date.getTime())) {
+					return dateStr || '';
+				}
 				const now = new Date();
 				const diffTime = Math.abs(now - date);
 				const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));

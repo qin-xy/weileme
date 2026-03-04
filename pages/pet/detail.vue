@@ -4,8 +4,11 @@
 			<view class="avatar-section">
 				<image :src="pet.avatar || '/static/default-pet.png'" mode="aspectFill" class="avatar"></image>
 			</view>
-			<view class="pet-info">
-				<view class="pet-name">{{pet.name}}</view>
+ 		<view class="pet-info">
+ 			<view class="pet-name-row">
+ 				<view class="pet-name">{{pet.name}}</view>
+ 				<button class="action-btn delete-btn header-delete" @tap="confirmDelete">删除</button>
+ 			</view>
 				<view class="pet-meta">
 					<text class="meta-tag">{{getPetTypeText(pet.type)}}</text>
 					<text class="meta-tag" v-if="pet.breed">{{pet.breed}}</text>
@@ -73,6 +76,9 @@
 </template>
 
 <script>
+	import { getPetById, getRecords, getReminders, deletePet } from '../../utils/api.js';
+	import { getUserId } from '../../utils/user.js';
+
 	export default {
 		data() {
 			return {
@@ -91,27 +97,65 @@
 			this.loadData();
 		},
 		methods: {
-			loadData() {
-				// 加载宠物信息
-				const pets = uni.getStorageSync('pets') || [];
-				this.pet = pets.find(p => p.id === this.petId);
+			async loadData() {
+				try {
+					const userId = await getUserId();
+					const [pet, records, reminders] = await Promise.all([
+						getPetById(this.petId),
+						getRecords({ petId: this.petId, userId }),
+						getReminders({ petId: this.petId, userId })
+					]);
 
-				// 加载该宠物的记录
-				const allRecords = uni.getStorageSync('records') || [];
-				this.records = allRecords
-					.filter(r => r.petId === this.petId)
-					.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-				// 加载该宠物的提醒
-				const allReminders = uni.getStorageSync('reminders') || [];
-				this.reminders = allReminders
-					.filter(r => r.petId === this.petId)
-					.sort((a, b) => new Date(a.targetDate) - new Date(b.targetDate));
+					this.pet = pet || null;
+					this.records = (records || []).sort((a, b) => this.parseRecordDate(b.date) - this.parseRecordDate(a.date));
+					this.reminders = (reminders || []).sort((a, b) => new Date(a.targetDate) - new Date(b.targetDate));
+				} catch (error) {
+					this.pet = null;
+					this.records = [];
+					this.reminders = [];
+					uni.showToast({ title: error.message || '加载失败', icon: 'none' });
+				}
 			},
 
 			addRecord() {
 				uni.navigateTo({
 					url: `/pages/record/add?petId=${this.petId}`
+				});
+			},
+
+			confirmDelete() {
+				if (!this.petId) return;
+				uni.showModal({
+					title: '删除宠物',
+					content: '删除后将无法恢复，相关记录与提醒也会同时清除。确定删除吗？',
+					confirmText: '删除',
+					confirmColor: '#d9534f',
+					success: async (res) => {
+						if (!res.confirm) return;
+						try {
+							uni.showLoading({ title: '删除中...' });
+							const result = await deletePet(this.petId);
+							if (result && result.success === false) {
+								throw new Error('删除失败');
+							}
+							this.pet = null;
+							this.records = [];
+							this.reminders = [];
+							uni.showToast({
+								title: '删除成功',
+								icon: 'success',
+								success: () => {
+									setTimeout(() => {
+										uni.navigateBack();
+									}, 1200);
+								}
+							});
+						} catch (error) {
+							uni.showToast({ title: error.message || '删除失败', icon: 'none' });
+						} finally {
+							uni.hideLoading();
+						}
+					}
 				});
 			},
 
@@ -199,8 +243,30 @@
 				return texts[status] || status;
 			},
 
+			parseRecordDate(dateStr) {
+				if (!dateStr) return new Date(0);
+				const directDate = new Date(dateStr);
+				if (!isNaN(directDate.getTime())) {
+					return directDate;
+				}
+
+				const match = dateStr.match(/^(\d{1,2})月(\d{1,2})日\s*(\d{1,2})?:?(\d{2})?$/);
+				if (!match) return new Date(0);
+
+				const [, monthStr, dayStr, hourStr, minuteStr] = match;
+				const year = new Date().getFullYear();
+				const month = Number(monthStr) - 1;
+				const day = Number(dayStr);
+				const hour = hourStr ? Number(hourStr) : 0;
+				const minute = minuteStr ? Number(minuteStr) : 0;
+				return new Date(year, month, day, hour, minute);
+			},
+
 			formatDateTime(dateStr) {
-				const date = new Date(dateStr);
+				const date = this.parseRecordDate(dateStr);
+				if (isNaN(date.getTime())) {
+					return dateStr || '';
+				}
 				const now = new Date();
 				const diffTime = Math.abs(now - date);
 				const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
@@ -223,6 +289,9 @@
 
 			formatDate(dateStr) {
 				const date = new Date(dateStr);
+				if (isNaN(date.getTime())) {
+					return dateStr || '';
+				}
 				return `${date.getMonth() + 1}月${date.getDate()}日`;
 			}
 		}
@@ -260,10 +329,30 @@
 		color: #fff;
 	}
 
+	.pet-name-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 16rpx;
+	}
+
 	.pet-name {
 		font-size: 44rpx;
 		font-weight: 800;
 		margin-bottom: 16rpx;
+	}
+
+	.header-delete {
+		font-size: 24rpx;
+		padding: 0 24rpx;
+		height: 56rpx;
+		line-height: 56rpx;
+		border-radius: 28rpx;
+		margin: 0;
+		background: rgba(255, 255, 255, 0.85);
+		color: #999;
+		border: 2rpx solid rgba(255, 255, 255, 0.9);
+		box-shadow: none;
 	}
 
 	.pet-meta {
@@ -463,6 +552,9 @@
 		padding: 20rpx 40rpx;
 		background-color: #fff;
 		box-shadow: 0 -4rpx 20rpx rgba(0,0,0,0.06);
+		display: flex;
+		flex-direction: column;
+		gap: 16rpx;
 	}
 
 	.action-btn {
@@ -478,5 +570,13 @@
 	.action-btn:active {
 		opacity: 0.9;
 		transform: scale(0.98);
+	}
+
+	.delete-btn {
+		background: #f5f5f5;
+		color: #999;
+		font-weight: 600;
+		box-shadow: none;
+		border: 2rpx solid #eee;
 	}
 </style>
