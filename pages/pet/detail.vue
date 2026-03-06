@@ -1,76 +1,92 @@
 <template>
 	<view class="container">
-		<view v-if="pet" class="pet-header">
-			<view class="avatar-section">
-				<image :src="pet.avatar || '/static/default-pet.png'" mode="aspectFill" class="avatar"></image>
-			</view>
- 		<view class="pet-info">
- 			<view class="pet-name-row">
- 				<view class="pet-name">{{pet.name}}</view>
- 				<button class="action-btn delete-btn header-delete" @tap="confirmDelete">删除</button>
- 			</view>
-				<view class="pet-meta">
-					<text class="meta-tag">{{getPetTypeText(pet.type)}}</text>
-					<text class="meta-tag" v-if="pet.breed">{{pet.breed}}</text>
-					<text class="meta-tag" v-if="pet.gender">{{pet.gender === 'male' ? '♂ 公' : '♀ 母'}}</text>
+		<!-- 头部背景与基本信息 -->
+		<view v-if="pet" class="profile-header">
+			<view class="header-content">
+				<view class="avatar-box">
+					<image :src="pet.avatar || '/static/default-pet.png'" mode="aspectFill" class="large-avatar"></image>
+					<view class="gender-badge" :class="pet.gender">
+						{{pet.gender === 'male' ? '♂' : '♀'}}
+					</view>
 				</view>
-				<view class="pet-meta-detail">
-					<text v-if="pet.birthday">🎂 {{calculateAge(pet.birthday)}}</text>
-					<text v-if="pet.weight">⚖️ {{pet.weight}}kg</text>
+				<view class="main-info">
+					<view class="name-row">
+						<text class="pet-name-title">{{pet.name}}</text>
+						<view class="type-pill">{{getPetTypeText(pet.type)}}</view>
+					</view>
+					<view class="meta-row">
+						<view class="meta-item">🎂 {{calculateAge(pet.birthday)}}</view>
+						<view class="meta-item">⚖️ {{pet.weight}}kg</view>
+						<view class="meta-item" v-if="pet.breed">🧬 {{pet.breed}}</view>
+					</view>
+				</view>
+				<view class="header-actions">
+					<view class="delete-circle-btn" @tap="confirmDelete">×</view>
 				</view>
 			</view>
 		</view>
 
-		<view class="tabs">
-			<view class="tab" :class="{active: activeTab === 0}" @tap="activeTab = 0">记录</view>
-			<view class="tab" :class="{active: activeTab === 1}" @tap="activeTab = 1">提醒</view>
+		<!-- 选项卡切换 -->
+		<view class="tab-scroller">
+			<view class="tab-pill-container">
+				<view class="pill-tab" :class="{active: activeTab === 0}" @tap="activeTab = 0">时光记录</view>
+				<view class="pill-tab" :class="{active: activeTab === 1}" @tap="activeTab = 1">专属提醒</view>
+			</view>
 		</view>
 
-		<view v-if="activeTab === 0" class="records-section">
-			<view class="record-list" v-if="records.length > 0">
-				<view class="record-card" v-for="record in records" :key="record.id" @tap="viewRecordDetail(record)">
-					<view class="record-header">
-						<text class="record-icon">{{getRecordIcon(record.type)}}</text>
-						<text class="record-type">{{getRecordTypeName(record.type)}}</text>
-						<text class="record-time">{{formatDateTime(record.date)}}</text>
+		<!-- 时光记录板块 -->
+		<view v-if="activeTab === 0" class="content-view">
+			<view class="record-feed" v-if="records.length > 0">
+				<view class="feed-item" v-for="record in records" :key="record.id" @tap="viewRecordDetail(record)">
+					<view class="feed-sidebar">
+						<view class="feed-icon-circle">{{getRecordIcon(record.type)}}</view>
+						<view class="feed-line"></view>
 					</view>
-					<view class="record-body">
-						<text class="record-remark">{{record.remark}}</text>
-					</view>
-					<view class="record-images" v-if="record.images && record.images.length > 0">
-						<image v-for="(img, idx) in record.images.slice(0, 3)" :key="idx" :src="img" mode="aspectFill" class="record-image"></image>
+					<view class="feed-main">
+						<view class="feed-header">
+							<text class="feed-type-label">{{getRecordTypeName(record.type)}}</text>
+							<text class="feed-time-label">{{formatDateTime(record.date)}}</text>
+						</view>
+						<view class="feed-body" v-if="record.remark || (record.images && record.images.length)">
+							<text class="feed-text" v-if="record.remark">{{record.remark}}</text>
+							<view class="feed-photos" v-if="record.images && record.images.length">
+								<image v-for="(img, i) in record.images.slice(0, 3)" :key="i" :src="img" mode="aspectFill" class="feed-img"></image>
+							</view>
+						</view>
 					</view>
 				</view>
 			</view>
-			<view class="empty-state" v-else>
-				<text class="empty-icon">📝</text>
-				<text class="empty-text">还没有记录</text>
-				<text class="empty-tip">点击下方按钮添加第一条记录</text>
+			<view class="empty-state-modern" v-else>
+				<text class="empty-emoji">🎞️</text>
+				<text class="empty-h1">还没有故事</text>
+				<button class="add-mini-btn" @tap="addRecord">去记第一笔</button>
 			</view>
 		</view>
 
-		<view v-if="activeTab === 1" class="reminders-section">
-			<view class="reminder-list" v-if="reminders.length > 0">
-				<view class="reminder-card" v-for="reminder in reminders" :key="reminder.id">
-					<text class="reminder-icon">{{getReminderIcon(reminder.type)}}</text>
-					<view class="reminder-info">
-						<view class="reminder-title">{{reminder.title}}</view>
-						<view class="reminder-date">📅 {{formatDate(reminder.targetDate)}}</view>
+		<!-- 提醒板块 -->
+		<view v-if="activeTab === 1" class="content-view">
+			<view class="remind-grid" v-if="reminders.length > 0">
+				<view class="remind-item-card" v-for="reminder in reminders" :key="reminder.id">
+					<view class="remind-icon-box">{{getReminderIcon(reminder.type)}}</view>
+					<view class="remind-body">
+						<text class="remind-h">{{reminder.title}}</text>
+						<text class="remind-d">📅 {{formatDate(reminder.targetDate)}}</text>
 					</view>
-					<view class="reminder-status" :class="reminder.status">
+					<view class="remind-st" :class="reminder.status">
 						{{getReminderStatusText(reminder.status)}}
 					</view>
 				</view>
 			</view>
-			<view class="empty-state" v-else>
-				<text class="empty-icon">⏰</text>
-				<text class="empty-text">还没有提醒</text>
-				<text class="empty-tip">添加记录时可以设置提醒</text>
+			<view class="empty-state-modern" v-else>
+				<text class="empty-emoji">⏰</text>
+				<text class="empty-h1">一切都准时</text>
+				<text class="empty-h2">暂无待办提醒</text>
 			</view>
 		</view>
 
-		<view class="footer-actions">
-			<button class="action-btn" @tap="addRecord">📝 添加记录</button>
+		<!-- 悬浮操作按钮 -->
+		<view class="floating-fab" @tap="addRecord">
+			<text class="fab-plus">+</text>
 		</view>
 	</view>
 </template>
@@ -81,218 +97,58 @@
 
 	export default {
 		data() {
-			return {
-				petId: '',
-				pet: null,
-				activeTab: 0,
-				records: [],
-				reminders: []
-			}
+			return { petId: '', pet: null, activeTab: 0, records: [], reminders: [] }
 		},
-		onLoad(options) {
-			this.petId = options.id;
-			this.loadData();
-		},
-		onShow() {
-			this.loadData();
-		},
+		onLoad(options) { this.petId = options.id; this.loadData(); },
+		onShow() { this.loadData(); },
 		methods: {
 			async loadData() {
-				try {
-					const userId = await getUserId();
-					const [pet, records, reminders] = await Promise.all([
-						getPetById(this.petId),
-						getRecords({ petId: this.petId, userId }),
-						getReminders({ petId: this.petId, userId })
-					]);
-
-					this.pet = pet || null;
-					this.records = (records || []).sort((a, b) => this.parseRecordDate(b.date) - this.parseRecordDate(a.date));
-					this.reminders = (reminders || []).sort((a, b) => new Date(a.targetDate) - new Date(b.targetDate));
-				} catch (error) {
-					this.pet = null;
-					this.records = [];
-					this.reminders = [];
-					uni.showToast({ title: error.message || '加载失败', icon: 'none' });
-				}
+				const userId = await getUserId();
+				const [p, r, m] = await Promise.all([
+					getPetById(this.petId),
+					getRecords({ petId: this.petId, userId }),
+					getReminders({ petId: this.petId, userId })
+				]);
+				this.pet = p;
+				this.records = (r || []).sort((a, b) => new Date(b.date) - new Date(a.date));
+				this.reminders = (m || []).sort((a, b) => new Date(a.targetDate) - new Date(b.targetDate));
 			},
-
-			addRecord() {
-				uni.navigateTo({
-					url: `/pages/record/add?petId=${this.petId}`
-				});
-			},
-
+			addRecord() { uni.navigateTo({ url: `/pages/record/add?petId=${this.petId}` }); },
 			confirmDelete() {
-				if (!this.petId) return;
 				uni.showModal({
-					title: '删除宠物',
-					content: '删除后将无法恢复，相关记录与提醒也会同时清除。确定删除吗？',
-					confirmText: '删除',
-					confirmColor: '#d9534f',
+					title: '操作确认',
+					content: '要告别这个小伙伴吗？相关记录也将消失...',
+					confirmColor: '#FF5A5F',
 					success: async (res) => {
-						if (!res.confirm) return;
-						try {
-							uni.showLoading({ title: '删除中...' });
-							const result = await deletePet(this.petId);
-							if (result && result.success === false) {
-								throw new Error('删除失败');
-							}
-							this.pet = null;
-							this.records = [];
-							this.reminders = [];
-							uni.showToast({
-								title: '删除成功',
-								icon: 'success',
-								success: () => {
-									setTimeout(() => {
-										uni.navigateBack();
-									}, 1200);
-								}
-							});
-						} catch (error) {
-							uni.showToast({ title: error.message || '删除失败', icon: 'none' });
-						} finally {
-							uni.hideLoading();
+						if (res.confirm) {
+							await deletePet(this.petId);
+							uni.showToast({ title: '已告别', icon: 'success' });
+							setTimeout(() => uni.navigateBack(), 1200);
 						}
 					}
 				});
 			},
-
-			viewRecordDetail(record) {
-				uni.showModal({
-					title: getRecordTypeName(record.type),
-					content: record.remark,
-					showCancel: false
-				});
+			viewRecordDetail(record) { uni.showModal({ title: this.getRecordTypeName(record.type), content: record.remark || '没有写下文字', showCancel: false }); },
+			calculateAge(bd) {
+				if (!bd) return '未知';
+				const diff = Math.ceil((new Date() - new Date(bd)) / 86400000);
+				return diff < 365 ? `${Math.floor(diff/30) || 1}个月` : `${Math.floor(diff/365)}岁`;
 			},
-
-			getPetTypeText(type) {
-				const types = {
-					'狗狗': '狗狗',
-					'猫咪': '猫咪',
-					'鸟类': '鸟类',
-					'其他': '其他'
-				};
-				return types[type] || type;
+			getPetTypeText(t) { return t || '小成员'; },
+			getRecordIcon(t) {
+				const i = { 'feed': '🍖', 'walk': '🚶', 'bath': '🛁', 'vaccine': '💉', 'medical': '🏥', 'weight': '⚖️' };
+				return i[t] || '📦';
 			},
-
-			calculateAge(birthday) {
-				if (!birthday) return '未知';
-				const birth = new Date(birthday);
-				const now = new Date();
-				const diffTime = Math.abs(now - birth);
-				const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-				if (diffDays < 30) {
-					return `${diffDays}天`;
-				} else if (diffDays < 365) {
-					return `${Math.floor(diffDays / 30)}个月`;
-				} else {
-					return `${Math.floor(diffDays / 365)}岁`;
-				}
+			getRecordTypeName(t) {
+				const n = { 'feed': '喂食', 'walk': '遛弯', 'bath': '洗澡', 'vaccine': '疫苗', 'medical': '就医', 'weight': '体重' };
+				return n[t] || '记录';
 			},
-
-			getRecordIcon(type) {
-				const icons = {
-					'feed': '🍖',
-					'walk': '🚶',
-					'bath': '🛁',
-					'vaccine': '💉',
-					'deworm': '💊',
-					'medical': '🏥',
-					'sleep': '😴',
-					'weight': '⚖️',
-					'other': '📦'
-				};
-				return icons[type] || '📦';
-			},
-
-			getRecordTypeName(type) {
-				const names = {
-					'feed': '喂食',
-					'walk': '遛弯',
-					'bath': '洗澡',
-					'vaccine': '打疫苗',
-					'deworm': '驱虫',
-					'medical': '就医',
-					'sleep': '睡觉',
-					'weight': '体重记录',
-					'other': '其他'
-				};
-				return names[type] || type;
-			},
-
-			getReminderIcon(type) {
-				const icons = {
-					'vaccine': '💉',
-					'deworm': '💊',
-					'bath': '🛁',
-					'medical': '🏥',
-					'other': '⏰'
-				};
-				return icons[type] || '⏰';
-			},
-
-			getReminderStatusText(status) {
-				const texts = {
-					'pending': '待提醒',
-					'reminded': '已提醒',
-					'completed': '已完成'
-				};
-				return texts[status] || status;
-			},
-
-			parseRecordDate(dateStr) {
-				if (!dateStr) return new Date(0);
-				const directDate = new Date(dateStr);
-				if (!isNaN(directDate.getTime())) {
-					return directDate;
-				}
-
-				const match = dateStr.match(/^(\d{1,2})月(\d{1,2})日\s*(\d{1,2})?:?(\d{2})?$/);
-				if (!match) return new Date(0);
-
-				const [, monthStr, dayStr, hourStr, minuteStr] = match;
-				const year = new Date().getFullYear();
-				const month = Number(monthStr) - 1;
-				const day = Number(dayStr);
-				const hour = hourStr ? Number(hourStr) : 0;
-				const minute = minuteStr ? Number(minuteStr) : 0;
-				return new Date(year, month, day, hour, minute);
-			},
-
-			formatDateTime(dateStr) {
-				const date = this.parseRecordDate(dateStr);
-				if (isNaN(date.getTime())) {
-					return dateStr || '';
-				}
-				const now = new Date();
-				const diffTime = Math.abs(now - date);
-				const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-				if (diffDays === 0) {
-					const hours = Math.floor(diffTime / (1000 * 60 * 60));
-					const minutes = Math.floor((diffTime % (1000 * 60 * 60)) / (1000 * 60));
-					if (hours === 0) {
-						return `${minutes}分钟前`;
-					}
-					return `${hours}小时前`;
-				} else if (diffDays === 1) {
-					return `昨天 ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-				} else if (diffDays < 7) {
-					return `${diffDays}天前`;
-				} else {
-					return `${date.getMonth() + 1}/${date.getDate()}`;
-				}
-			},
-
-			formatDate(dateStr) {
-				const date = new Date(dateStr);
-				if (isNaN(date.getTime())) {
-					return dateStr || '';
-				}
-				return `${date.getMonth() + 1}月${date.getDate()}日`;
+			getReminderIcon(t) { return this.getRecordIcon(t) || '⏰'; },
+			getReminderStatusText(s) { return { 'pending': '待出发', 'reminded': '已过', 'completed': '搞定' }[s] || s; },
+			formatDateTime(str) { return str.split(' ')[0]; },
+			formatDate(str) {
+				const d = new Date(str);
+				return `${d.getMonth()+1}月${d.getDate()}日`;
 			}
 		}
 	}
@@ -301,282 +157,149 @@
 <style>
 	.container {
 		min-height: 100vh;
-		background-color: #f8f9fa;
-		padding-bottom: 120rpx;
+		background-color: var(--bg-main);
+		padding-bottom: 160rpx;
 	}
 
-	.pet-header {
-		background: linear-gradient(135deg, #ffb347, #ff6b6b);
-		padding: 60rpx 40rpx 40rpx;
+	.profile-header {
+		background: linear-gradient(180deg, var(--primary-light) 0%, var(--bg-main) 100%);
+		padding: 80rpx 40rpx 40rpx;
+	}
+
+	.header-content {
 		display: flex;
 		align-items: center;
-		border-radius: 0 0 40rpx 40rpx;
-	}
-
-	.avatar-section {
-		margin-right: 32rpx;
-	}
-
-	.avatar {
-		width: 160rpx;
-		height: 160rpx;
-		border-radius: 50%;
-		border: 6rpx solid rgba(255, 255, 255, 0.5);
-	}
-
-	.pet-info {
-		flex: 1;
-		color: #fff;
-	}
-
-	.pet-name-row {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 16rpx;
-	}
-
-	.pet-name {
-		font-size: 44rpx;
-		font-weight: 800;
-		margin-bottom: 16rpx;
-	}
-
-	.header-delete {
-		font-size: 24rpx;
-		padding: 0 24rpx;
-		height: 56rpx;
-		line-height: 56rpx;
-		border-radius: 28rpx;
-		margin: 0;
-		background: rgba(255, 255, 255, 0.85);
-		color: #999;
-		border: 2rpx solid rgba(255, 255, 255, 0.9);
-		box-shadow: none;
-	}
-
-	.pet-meta {
-		display: flex;
-		gap: 12rpx;
-		margin-bottom: 12rpx;
-	}
-
-	.meta-tag {
-		background: rgba(255, 255, 255, 0.3);
-		padding: 6rpx 16rpx;
-		border-radius: 16rpx;
-		font-size: 22rpx;
-		font-weight: 600;
-	}
-
-	.pet-meta-detail {
-		font-size: 24rpx;
-		opacity: 0.9;
-	}
-
-	.tabs {
-		display: flex;
-		background-color: #fff;
-		margin-bottom: 24rpx;
-	}
-
-	.tab {
-		flex: 1;
-		text-align: center;
-		padding: 32rpx 0;
-		font-size: 30rpx;
-		font-weight: 600;
-		color: #999;
 		position: relative;
 	}
 
-	.tab.active {
-		color: #ff6b6b;
+	.avatar-box {
+		position: relative;
+		margin-right: 32rpx;
 	}
 
-	.tab.active::after {
-		content: '';
+	.large-avatar {
+		width: 180rpx;
+		height: 180rpx;
+		border-radius: var(--radius-full);
+		border: 8rpx solid #FFF;
+		box-shadow: var(--shadow-soft);
+	}
+
+	.gender-badge {
 		position: absolute;
-		bottom: 0;
-		left: 50%;
-		transform: translateX(-50%);
-		width: 60rpx;
-		height: 6rpx;
-		background: #ffb347;
-		border-radius: 3rpx;
-	}
-
-	.records-section, .reminders-section {
-		padding: 24rpx;
-	}
-
-	.record-list, .reminder-list {
-		display: flex;
-		flex-direction: column;
-		gap: 20rpx;
-	}
-
-	.record-card {
-		background-color: #fff;
-		border-radius: 24rpx;
-		padding: 28rpx;
-		box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.05);
-	}
-
-	.record-header {
+		bottom: 10rpx;
+		right: 10rpx;
+		width: 44rpx;
+		height: 44rpx;
+		border-radius: var(--radius-full);
 		display: flex;
 		align-items: center;
-		margin-bottom: 16rpx;
+		justify-content: center;
+		font-weight: 800;
+		color: #FFF;
+		font-size: 24rpx;
+		border: 4rpx solid #FFF;
+	}
+	.gender-badge.male { background-color: #4A90E2; }
+	.gender-badge.female { background-color: #FF5A5F; }
+
+	.main-info { flex: 1; }
+	.pet-name-title { font-size: 52rpx; font-weight: 800; color: var(--text-main); margin-bottom: 12rpx; display: block; }
+	
+	.name-row { display: flex; align-items: center; gap: 16rpx; }
+	.type-pill {
+		background-color: var(--primary);
+		color: var(--text-main);
+		font-size: 20rpx;
+		font-weight: 700;
+		padding: 4rpx 16rpx;
+		border-radius: var(--radius-full);
 	}
 
-	.record-icon {
-		font-size: 36rpx;
-		margin-right: 12rpx;
+	.meta-row { display: flex; gap: 20rpx; font-size: 24rpx; color: var(--text-muted); font-weight: 500; }
+
+	.header-actions { position: absolute; top: -20rpx; right: 0; }
+	.delete-circle-btn {
+		width: 60rpx; height: 60rpx; background-color: #FFF;
+		border-radius: var(--radius-full); display: flex; align-items: center; justify-content: center;
+		color: var(--text-muted); font-size: 40rpx; box-shadow: var(--shadow-soft);
 	}
 
-	.record-type {
+	.tab-scroller { margin: 20rpx 0; padding: 0 40rpx; }
+	.tab-pill-container {
+		background-color: #EFE6D5;
+		height: 90rpx;
+		border-radius: var(--radius-full);
+		display: flex;
+		padding: 10rpx;
+	}
+
+	.pill-tab {
+		flex: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 		font-size: 28rpx;
 		font-weight: 700;
-		color: #333;
-		flex: 1;
+		color: var(--text-muted);
+		border-radius: var(--radius-full);
+		transition: all 0.3s;
 	}
 
-	.record-time {
-		font-size: 24rpx;
-		color: #999;
+	.pill-tab.active { background-color: #FFF; color: var(--text-main); box-shadow: var(--shadow-soft); }
+
+	.content-view { padding: 40rpx; }
+
+	.record-feed { display: flex; flex-direction: column; }
+	.feed-item { display: flex; margin-bottom: 40rpx; }
+	.feed-sidebar { display: flex; flex-direction: column; align-items: center; margin-right: 24rpx; }
+	.feed-icon-circle {
+		width: 72rpx; height: 72rpx; background-color: #FFF; border-radius: var(--radius-full);
+		display: flex; align-items: center; justify-content: center; font-size: 36rpx;
+		box-shadow: var(--shadow-soft); z-index: 2;
+	}
+	.feed-line { flex: 1; width: 4rpx; background-color: #EFE6D5; margin-top: 10rpx; }
+
+	.feed-main {
+		flex: 1; background-color: #FFF; border-radius: var(--radius-md);
+		padding: 24rpx; box-shadow: var(--shadow-soft);
+	}
+	.feed-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16rpx; }
+	.feed-type-label { font-size: 28rpx; font-weight: 800; color: var(--text-main); }
+	.feed-time-label { font-size: 22rpx; color: var(--text-muted); }
+	
+	.feed-text { font-size: 26rpx; color: var(--text-muted); line-height: 1.6; display: block; margin-bottom: 16rpx; }
+	.feed-photos { display: flex; gap: 12rpx; }
+	.feed-img { width: 110rpx; height: 110rpx; border-radius: var(--radius-sm); }
+
+	.remind-grid { display: grid; gap: 24rpx; }
+	.remind-item-card {
+		background-color: #FFF; border-radius: var(--radius-md); padding: 24rpx;
+		display: flex; align-items: center; box-shadow: var(--shadow-soft);
+	}
+	.remind-icon-box { font-size: 44rpx; margin-right: 24rpx; }
+	.remind-body { flex: 1; }
+	.remind-h { font-size: 28rpx; font-weight: 800; color: var(--text-main); display: block; }
+	.remind-d { font-size: 22rpx; color: var(--secondary); font-weight: 600; }
+	.remind-st { font-size: 20rpx; font-weight: 700; padding: 6rpx 16rpx; border-radius: var(--radius-full); }
+	.remind-st.pending { background-color: var(--primary-light); color: var(--primary); }
+
+	.empty-state-modern {
+		padding: 100rpx 40rpx; text-align: center;
+		display: flex; flex-direction: column; align-items: center;
+	}
+	.empty-emoji { font-size: 100rpx; margin-bottom: 24rpx; }
+	.empty-h1 { font-size: 32rpx; font-weight: 800; color: var(--text-main); margin-bottom: 40rpx; }
+	.add-mini-btn {
+		background-color: var(--primary); padding: 16rpx 48rpx;
+		border-radius: var(--radius-full); font-size: 26rpx; font-weight: 700; border: none;
 	}
 
-	.record-body {
-		margin-bottom: 16rpx;
+	.floating-fab {
+		position: fixed; bottom: 60rpx; right: 60rpx;
+		width: 120rpx; height: 120rpx; background-color: var(--primary);
+		border-radius: var(--radius-full); display: flex; align-items: center; justify-content: center;
+		box-shadow: 0 12rpx 24rpx rgba(255, 182, 41, 0.4); z-index: 1000;
 	}
-
-	.record-remark {
-		font-size: 26rpx;
-		color: #666;
-		line-height: 1.5;
-	}
-
-	.record-images {
-		display: flex;
-		gap: 12rpx;
-	}
-
-	.record-image {
-		width: 140rpx;
-		height: 140rpx;
-		border-radius: 16rpx;
-	}
-
-	.reminder-card {
-		background-color: #fff;
-		border-radius: 24rpx;
-		padding: 28rpx;
-		display: flex;
-		align-items: center;
-		box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.05);
-	}
-
-	.reminder-icon {
-		font-size: 44rpx;
-		margin-right: 20rpx;
-	}
-
-	.reminder-info {
-		flex: 1;
-	}
-
-	.reminder-title {
-		font-size: 28rpx;
-		font-weight: 700;
-		color: #333;
-		margin-bottom: 8rpx;
-	}
-
-	.reminder-date {
-		font-size: 24rpx;
-		color: #ff6b6b;
-	}
-
-	.reminder-status {
-		padding: 8rpx 20rpx;
-		border-radius: 16rpx;
-		font-size: 22rpx;
-		font-weight: 600;
-	}
-
-	.reminder-status.pending {
-		background-color: #fff3e0;
-		color: #e65100;
-	}
-
-	.reminder-status.reminded {
-		background-color: #e3f2fd;
-		color: #1565c0;
-	}
-
-	.reminder-status.completed {
-		background-color: #e8f5e9;
-		color: #2e7d32;
-	}
-
-	.empty-state {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		padding: 120rpx 0;
-	}
-
-	.empty-icon {
-		font-size: 120rpx;
-		margin-bottom: 24rpx;
-		opacity: 0.5;
-	}
-
-	.empty-text {
-		font-size: 28rpx;
-		color: #999;
-		margin-bottom: 12rpx;
-		font-weight: 600;
-	}
-
-	.empty-tip {
-		font-size: 24rpx;
-		color: #ccc;
-	}
-
-	.footer-actions {
-		position: fixed;
-		bottom: 0;
-		left: 0;
-		right: 0;
-		padding: 20rpx 40rpx;
-		background-color: #fff;
-		box-shadow: 0 -4rpx 20rpx rgba(0,0,0,0.06);
-		display: flex;
-		flex-direction: column;
-		gap: 16rpx;
-	}
-
-	.action-btn {
-		background: linear-gradient(135deg, #ffb347, #ff8c42);
-		color: #fff;
-		font-weight: bold;
-		border-radius: 50rpx;
-		font-size: 32rpx;
-		border: none;
-		box-shadow: 0 10rpx 25rpx rgba(255, 140, 66, 0.3);
-	}
-
-	.action-btn:active {
-		opacity: 0.9;
-		transform: scale(0.98);
-	}
-
-	.delete-btn {
-		background: #f5f5f5;
-		color: #999;
-		font-weight: 600;
-		box-shadow: none;
-		border: 2rpx solid #eee;
-	}
+	.fab-plus { font-size: 60rpx; color: var(--text-main); font-weight: 800; }
 </style>

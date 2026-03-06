@@ -1,35 +1,41 @@
 <template>
 	<view class="container">
+		<view class="page-header">
+			<text class="page-title">闹钟与提醒</text>
+			<text class="page-subtitle">不错过每一个关爱时刻</text>
+		</view>
+
 		<view class="reminder-list" v-if="reminders.length > 0">
-			<view class="reminder-card" v-for="reminder in reminders" :key="reminder.id">
-				<view class="reminder-left">
-					<text class="reminder-icon">{{getReminderIcon(reminder.type)}}</text>
-					<view class="reminder-info">
-						<view class="reminder-title">{{reminder.title}}</view>
-						<view class="reminder-pet">{{getPetName(reminder.petId)}}</view>
-						<view class="reminder-date">📅 {{formatDate(reminder.targetDate)}}</view>
+			<view class="reminder-card-modern" v-for="reminder in reminders" :key="reminder.id">
+				<view class="card-left-icon">
+					<view class="icon-circle" :class="reminder.status">{{getReminderIcon(reminder.type)}}</view>
+				</view>
+				
+				<view class="card-center-info">
+					<text class="remind-title">{{reminder.title}}</text>
+					<view class="remind-meta">
+						<text class="pet-name">{{getPetName(reminder.petId)}}</text>
+						<text class="dot">·</text>
+						<text class="date-text">{{formatDate(reminder.targetDate)}}</text>
 					</view>
 				</view>
-				<view class="reminder-right">
-					<view class="reminder-status" :class="reminder.status">
+
+				<view class="card-right-status">
+					<view class="status-pill" :class="reminder.status">
 						{{getReminderStatusText(reminder.status)}}
 					</view>
-					<view class="reminder-actions">
-						<button class="action-btn complete-btn" size="mini" v-if="reminder.status === 'pending'" @tap="completeReminder(reminder)">
-							✓
-						</button>
-						<button class="action-btn delete-btn" size="mini" @tap="deleteReminder(reminder)">
-							×
-						</button>
+					<view class="action-row">
+						<view class="btn-round check" v-if="reminder.status === 'pending'" @tap="completeReminder(reminder)">✓</view>
+						<view class="btn-round trash" @tap="deleteReminder(reminder)">×</view>
 					</view>
 				</view>
 			</view>
 		</view>
 
-		<view class="empty-state" v-else>
-			<text class="empty-icon">⏰</text>
-			<text class="empty-text">还没有提醒</text>
-			<text class="empty-tip">添加疫苗、驱虫等记录时可以设置提醒</text>
+		<view class="empty-state-illust" v-else>
+			<text class="illust-icon">🔔</text>
+			<text class="illust-text">保持专注，暂时没有提醒</text>
+			<text class="illust-tip">去记录里设置下次提醒吧</text>
 		</view>
 	</view>
 </template>
@@ -37,100 +43,63 @@
 <script>
 	export default {
 		data() {
-			return {
-				reminders: [],
-				pets: []
-			}
+			return { reminders: [], pets: [] }
 		},
-		onLoad() {
-			this.loadData();
-		},
-		onShow() {
-			this.loadData();
-		},
+		onLoad() { this.loadData(); },
+		onShow() { this.loadData(); },
 		methods: {
 			loadData() {
 				this.pets = uni.getStorageSync('pets') || [];
-				const allReminders = uni.getStorageSync('reminders') || [];
-				this.reminders = allReminders.sort((a, b) => new Date(a.targetDate) - new Date(b.targetDate));
+				const all = uni.getStorageSync('reminders') || [];
+				this.reminders = all.sort((a, b) => new Date(a.targetDate) - new Date(b.targetDate));
 			},
-
 			completeReminder(reminder) {
 				uni.showModal({
-					title: '确认',
-					content: '确定完成这个提醒吗？',
+					title: '完成确认',
+					content: '已经完成这项任务了吗？',
 					success: (res) => {
 						if (res.confirm) {
-							// 更新提醒状态
-							let reminders = uni.getStorageSync('reminders') || [];
-							const index = reminders.findIndex(r => r.id === reminder.id);
-							if (index > -1) {
-								reminders[index].status = 'completed';
-								uni.setStorageSync('reminders', reminders);
+							let all = uni.getStorageSync('reminders') || [];
+							const idx = all.findIndex(r => r.id === reminder.id);
+							if (idx > -1) {
+								all[idx].status = 'completed';
+								uni.setStorageSync('reminders', all);
 								this.loadData();
 							}
 						}
 					}
 				});
 			},
-
 			deleteReminder(reminder) {
 				uni.showModal({
-					title: '确认',
-					content: '确定删除这个提醒吗？',
+					title: '删除提醒',
+					content: '不再需要这个提醒了吗？',
 					success: (res) => {
 						if (res.confirm) {
-							let reminders = uni.getStorageSync('reminders') || [];
-							reminders = reminders.filter(r => r.id !== reminder.id);
-							uni.setStorageSync('reminders', reminders);
+							let all = uni.getStorageSync('reminders') || [];
+							all = all.filter(r => r.id !== reminder.id);
+							uni.setStorageSync('reminders', all);
 							this.loadData();
 						}
 					}
 				});
 			},
-
-			getPetName(petId) {
-				const pet = this.pets.find(p => p.id === petId);
-				return pet ? pet.name : '未知';
-			},
-
+			getPetName(id) { return this.pets.find(p => p.id === id)?.name || '小可爱'; },
 			getReminderIcon(type) {
-				const icons = {
-					'vaccine': '💉',
-					'deworm': '💊',
-					'bath': '🛁',
-					'medical': '🏥',
-					'other': '⏰'
-				};
-				return icons[type] || '⏰';
+				const icons = { 'vaccine': '💉', 'deworm': '💊', 'bath': '🛁', 'medical': '🏥' };
+				return icons[type] || '🔔';
 			},
-
 			getReminderStatusText(status) {
-				const texts = {
-					'pending': '待提醒',
-					'reminded': '已提醒',
-					'completed': '已完成'
-				};
-				return texts[status] || status;
+				const tx = { 'pending': '待出发', 'reminded': '已提醒', 'completed': '已完成' };
+				return tx[status] || status;
 			},
-
-			formatDate(dateStr) {
-				const date = new Date(dateStr);
-				const now = new Date();
-				const diffTime = date - now;
-				const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-				if (diffDays < 0) {
-					return '已过期';
-				} else if (diffDays === 0) {
-					return '今天';
-				} else if (diffDays === 1) {
-					return '明天';
-				} else if (diffDays < 7) {
-					return `${diffDays}天后`;
-				} else {
-					return `${date.getMonth() + 1}月${date.getDate()}日`;
-				}
+			formatDate(str) {
+				const d = new Date(str); const now = new Date();
+				const diff = Math.ceil((d - now) / 86400000);
+				if (diff < 0) return '已过期';
+				if (diff === 0) return '今天';
+				if (diff === 1) return '明天';
+				return `${d.getMonth() + 1}月${d.getDate()}日`;
 			}
 		}
 	}
@@ -139,134 +108,76 @@
 <style>
 	.container {
 		min-height: 100vh;
-		background-color: #f8f9fa;
-		padding: 24rpx;
+		background-color: var(--bg-main);
+		padding: 40rpx;
 	}
 
-	.reminder-list {
-		display: flex;
-		flex-direction: column;
-		gap: 20rpx;
-	}
+	.page-header { margin-bottom: 60rpx; }
+	.page-title { font-size: 52rpx; font-weight: 800; color: var(--text-main); display: block; margin-bottom: 12rpx; }
+	.page-subtitle { font-size: 26rpx; color: var(--text-muted); }
 
-	.reminder-card {
-		background-color: #fff;
-		border-radius: 24rpx;
+	.reminder-list { display: flex; flex-direction: column; gap: 32rpx; }
+
+	.reminder-card-modern {
+		background-color: #FFF;
+		border-radius: var(--radius-lg);
 		padding: 32rpx;
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.05);
+		box-shadow: var(--shadow-soft);
 	}
 
-	.reminder-left {
+	.card-left-icon { margin-right: 32rpx; }
+	.icon-circle {
+		width: 100rpx;
+		height: 100rpx;
+		border-radius: var(--radius-full);
 		display: flex;
 		align-items: center;
-		flex: 1;
+		justify-content: center;
+		font-size: 48rpx;
+		background-color: var(--bg-main);
 	}
+	.icon-circle.pending { background-color: var(--primary-light); color: var(--primary); }
+	.icon-circle.completed { background-color: var(--secondary-light); color: var(--secondary); opacity: 0.6; }
 
-	.reminder-icon {
-		font-size: 56rpx;
-		margin-right: 24rpx;
-	}
+	.card-center-info { flex: 1; }
+	.remind-title { font-size: 32rpx; font-weight: 800; color: var(--text-main); margin-bottom: 12rpx; display: block; }
+	.remind-meta { display: flex; align-items: center; font-size: 22rpx; color: var(--text-muted); }
+	.pet-name { color: var(--secondary); font-weight: 600; }
+	.dot { margin: 0 10rpx; }
 
-	.reminder-info {
-		flex: 1;
-	}
-
-	.reminder-title {
-		font-size: 30rpx;
+	.card-right-status { display: flex; flex-direction: column; align-items: flex-end; gap: 20rpx; }
+	.status-pill {
+		padding: 6rpx 20rpx;
+		border-radius: var(--radius-full);
+		font-size: 20rpx;
 		font-weight: 700;
-		color: #333;
-		margin-bottom: 8rpx;
 	}
+	.status-pill.pending { background-color: var(--primary); color: #FFF; }
+	.status-pill.completed { background-color: var(--border-light); color: var(--text-muted); }
 
-	.reminder-pet {
-		font-size: 24rpx;
-		color: #ff6b6b;
-		margin-bottom: 6rpx;
-	}
-
-	.reminder-date {
-		font-size: 24rpx;
-		color: #999;
-	}
-
-	.reminder-right {
+	.action-row { display: flex; gap: 16rpx; }
+	.btn-round {
+		width: 56rpx;
+		height: 56rpx;
+		border-radius: var(--radius-full);
 		display: flex;
-		flex-direction: column;
-		align-items: flex-end;
-		gap: 12rpx;
-	}
-
-	.reminder-status {
-		padding: 8rpx 20rpx;
-		border-radius: 16rpx;
-		font-size: 22rpx;
-		font-weight: 600;
-	}
-
-	.reminder-status.pending {
-		background-color: #fff3e0;
-		color: #e65100;
-	}
-
-	.reminder-status.reminded {
-		background-color: #e3f2fd;
-		color: #1565c0;
-	}
-
-	.reminder-status.completed {
-		background-color: #e8f5e9;
-		color: #2e7d32;
-	}
-
-	.reminder-actions {
-		display: flex;
-		gap: 12rpx;
-	}
-
-	.action-btn {
-		width: 60rpx;
-		height: 60rpx;
-		border-radius: 50%;
-		border: none;
+		align-items: center;
+		justify-content: center;
 		font-size: 28rpx;
-		font-weight: bold;
+		font-weight: 800;
 	}
+	.btn-round.check { background-color: var(--secondary); color: #FFF; }
+	.btn-round.trash { background-color: var(--bg-main); color: var(--text-muted); }
 
-	.complete-btn {
-		background-color: #4caf50;
-		color: #fff;
-	}
-
-	.delete-btn {
-		background-color: #f44336;
-		color: #fff;
-	}
-
-	.empty-state {
+	.empty-state-illust {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		padding: 120rpx 0;
+		padding-top: 160rpx;
 	}
-
-	.empty-icon {
-		font-size: 120rpx;
-		margin-bottom: 24rpx;
-		opacity: 0.5;
-	}
-
-	.empty-text {
-		font-size: 28rpx;
-		color: #999;
-		margin-bottom: 12rpx;
-		font-weight: 600;
-	}
-
-	.empty-tip {
-		font-size: 24rpx;
-		color: #ccc;
-	}
+	.illust-icon { font-size: 160rpx; margin-bottom: 40rpx; opacity: 0.5; }
+	.illust-text { font-size: 32rpx; font-weight: 800; color: var(--text-main); margin-bottom: 16rpx; }
+	.illust-tip { font-size: 24rpx; color: var(--text-muted); }
 </style>
