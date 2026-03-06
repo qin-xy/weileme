@@ -1,35 +1,54 @@
 <template>
 	<view class="container">
-		<view class="reminder-list" v-if="reminders.length > 0">
-			<view class="reminder-card" v-for="reminder in reminders" :key="reminder.id">
-				<view class="reminder-left">
-					<text class="reminder-icon">{{getReminderIcon(reminder.type)}}</text>
-					<view class="reminder-info">
-						<view class="reminder-title">{{reminder.title}}</view>
-						<view class="reminder-pet">{{getPetName(reminder.petId)}}</view>
-						<view class="reminder-date">📅 {{formatDate(reminder.targetDate)}}</view>
+		<!-- 顶部导航栏 -->
+		<view class="nav-header">
+			<view class="nav-back" @tap="goBack">
+				<text class="back-icon">‹</text>
+			</view>
+			<text class="nav-title">提醒</text>
+			<view class="nav-placeholder"></view>
+		</view>
+
+		<view class="content">
+			<!-- 提醒列表 -->
+			<view class="reminder-list" v-if="reminders.length > 0">
+				<view class="reminder-card" v-for="reminder in reminders" :key="reminder.id">
+					<view class="reminder-main">
+						<view class="reminder-icon-wrap">
+							<text class="reminder-icon">{{getReminderIcon(reminder.type)}}</text>
+						</view>
+						<view class="reminder-content">
+							<text class="reminder-title">{{reminder.title}}</text>
+							<text class="reminder-pet">{{getPetName(reminder.petId)}}</text>
+							<view class="reminder-date">
+								<text class="date-icon">📅</text>
+								<text class="date-text">{{formatDate(reminder.targetDate)}}</text>
+							</view>
+						</view>
 					</view>
-				</view>
-				<view class="reminder-right">
-					<view class="reminder-status" :class="reminder.status">
-						{{getReminderStatusText(reminder.status)}}
-					</view>
-					<view class="reminder-actions">
-						<button class="action-btn complete-btn" size="mini" v-if="reminder.status === 'pending'" @tap="completeReminder(reminder)">
-							✓
-						</button>
-						<button class="action-btn delete-btn" size="mini" @tap="deleteReminder(reminder)">
-							×
-						</button>
+					<view class="reminder-right">
+						<view class="reminder-status" :class="reminder.status">
+							{{getReminderStatusText(reminder.status)}}
+						</view>
+						<view class="reminder-actions">
+							<view class="action-btn complete-btn" v-if="reminder.status === 'pending'" @tap="completeReminder(reminder)">
+								<text class="action-icon">✓</text>
+							</view>
+							<view class="action-btn delete-btn" @tap="deleteReminder(reminder)">
+								<text class="action-icon">×</text>
+							</view>
+						</view>
 					</view>
 				</view>
 			</view>
-		</view>
 
-		<view class="empty-state" v-else>
-			<text class="empty-icon">⏰</text>
-			<text class="empty-text">还没有提醒</text>
-			<text class="empty-tip">添加疫苗、驱虫等记录时可以设置提醒</text>
+			<view class="empty-state-custom" v-else>
+				<view class="empty-icon-wrap">
+					<text class="empty-icon">⏰</text>
+				</view>
+				<text class="empty-text">还没有提醒</text>
+				<text class="empty-tip">添加疫苗、驱虫等记录时可以设置提醒</text>
+			</view>
 		</view>
 	</view>
 </template>
@@ -49,6 +68,10 @@
 			this.loadData();
 		},
 		methods: {
+			goBack() {
+				uni.navigateBack();
+			},
+
 			loadData() {
 				this.pets = uni.getStorageSync('pets') || [];
 				const allReminders = uni.getStorageSync('reminders') || [];
@@ -61,7 +84,6 @@
 					content: '确定完成这个提醒吗？',
 					success: (res) => {
 						if (res.confirm) {
-							// 更新提醒状态
 							let reminders = uni.getStorageSync('reminders') || [];
 							const index = reminders.findIndex(r => r.id === reminder.id);
 							if (index > -1) {
@@ -139,10 +161,48 @@
 <style>
 	.container {
 		min-height: 100vh;
-		background-color: #f8f9fa;
-		padding: 24rpx;
+		background: linear-gradient(180deg, #FAF7F2 0%, #F5F0E8 100%);
 	}
 
+	/* 导航栏 */
+	.nav-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 100rpx 32rpx 24rpx;
+		background: linear-gradient(135deg, #C4A77D 0%, #A68B5B 100%);
+	}
+
+	.nav-back {
+		width: 64rpx;
+		height: 64rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.back-icon {
+		font-size: 48rpx;
+		color: #FFFFFF;
+		font-weight: 300;
+	}
+
+	.nav-title {
+		font-size: 34rpx;
+		font-weight: 600;
+		color: #FFFFFF;
+	}
+
+	.nav-placeholder {
+		width: 64rpx;
+	}
+
+	/* 内容区域 */
+	.content {
+		padding: 24rpx 32rpx;
+	}
+
+	/* 提醒列表 */
 	.reminder-list {
 		display: flex;
 		flex-direction: column;
@@ -150,75 +210,96 @@
 	}
 
 	.reminder-card {
-		background-color: #fff;
+		background: #FFFFFF;
 		border-radius: 24rpx;
-		padding: 32rpx;
+		padding: 28rpx;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.05);
+		box-shadow: 0 4rpx 16rpx rgba(61, 50, 41, 0.06);
 	}
 
-	.reminder-left {
+	.reminder-main {
 		display: flex;
 		align-items: center;
 		flex: 1;
 	}
 
-	.reminder-icon {
-		font-size: 56rpx;
-		margin-right: 24rpx;
+	.reminder-icon-wrap {
+		width: 72rpx;
+		height: 72rpx;
+		background: linear-gradient(135deg, #C4A77D 0%, #A68B5B 100%);
+		border-radius: 18rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		margin-right: 20rpx;
+		flex-shrink: 0;
 	}
 
-	.reminder-info {
+	.reminder-icon {
+		font-size: 36rpx;
+	}
+
+	.reminder-content {
 		flex: 1;
 	}
 
 	.reminder-title {
 		font-size: 30rpx;
 		font-weight: 700;
-		color: #333;
-		margin-bottom: 8rpx;
+		color: #3D3229;
+		margin-bottom: 6rpx;
 	}
 
 	.reminder-pet {
 		font-size: 24rpx;
-		color: #ff6b6b;
+		color: #C4A77D;
 		margin-bottom: 6rpx;
 	}
 
 	.reminder-date {
-		font-size: 24rpx;
-		color: #999;
+		display: flex;
+		align-items: center;
+		gap: 8rpx;
+	}
+
+	.date-icon {
+		font-size: 22rpx;
+	}
+
+	.date-text {
+		font-size: 22rpx;
+		color: #9B8B7A;
 	}
 
 	.reminder-right {
 		display: flex;
 		flex-direction: column;
 		align-items: flex-end;
-		gap: 12rpx;
+		gap: 16rpx;
 	}
 
 	.reminder-status {
 		padding: 8rpx 20rpx;
-		border-radius: 16rpx;
+		border-radius: 20rpx;
 		font-size: 22rpx;
 		font-weight: 600;
 	}
 
 	.reminder-status.pending {
-		background-color: #fff3e0;
-		color: #e65100;
+		background: #F4E4D6;
+		color: #C4A77D;
 	}
 
 	.reminder-status.reminded {
-		background-color: #e3f2fd;
-		color: #1565c0;
+		background: #E8F4FD;
+		color: #7D9BC4;
 	}
 
 	.reminder-status.completed {
-		background-color: #e8f5e9;
-		color: #2e7d32;
+		background: #E8F5E9;
+		color: #7D9B76;
 	}
 
 	.reminder-actions {
@@ -227,46 +308,60 @@
 	}
 
 	.action-btn {
-		width: 60rpx;
-		height: 60rpx;
+		width: 56rpx;
+		height: 56rpx;
 		border-radius: 50%;
-		border: none;
-		font-size: 28rpx;
-		font-weight: bold;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
 
 	.complete-btn {
-		background-color: #4caf50;
-		color: #fff;
+		background: linear-gradient(135deg, #7D9B76 0%, #6B8A65 100%);
 	}
 
 	.delete-btn {
-		background-color: #f44336;
-		color: #fff;
+		background: linear-gradient(135deg, #C4786E 0%, #B3685F 100%);
 	}
 
-	.empty-state {
+	.action-icon {
+		color: #FFFFFF;
+		font-size: 28rpx;
+		font-weight: 600;
+	}
+
+	/* 空状态 */
+	.empty-state-custom {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		padding: 120rpx 0;
 	}
 
-	.empty-icon {
-		font-size: 120rpx;
+	.empty-icon-wrap {
+		width: 140rpx;
+		height: 140rpx;
+		background: linear-gradient(135deg, #F4E4D6 0%, #E8D5C4 100%);
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 		margin-bottom: 24rpx;
-		opacity: 0.5;
+	}
+
+	.empty-icon {
+		font-size: 72rpx;
 	}
 
 	.empty-text {
-		font-size: 28rpx;
-		color: #999;
+		font-size: 30rpx;
+		color: #3D3229;
 		margin-bottom: 12rpx;
 		font-weight: 600;
 	}
 
 	.empty-tip {
 		font-size: 24rpx;
-		color: #ccc;
+		color: #9B8B7A;
 	}
 </style>

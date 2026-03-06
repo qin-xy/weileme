@@ -1,8 +1,19 @@
 <template>
 	<view class="container">
+		<!-- 顶部导航栏 -->
+		<view class="nav-header">
+			<view class="nav-back" @tap="goBack">
+				<text class="back-icon">‹</text>
+			</view>
+			<text class="nav-title">添加记录</text>
+			<view class="nav-placeholder"></view>
+		</view>
+
 		<!-- 空状态：没有宠物 -->
 		<view class="empty-pet-state" v-if="pets.length === 0">
-			<text class="empty-icon">🐾</text>
+			<view class="empty-icon-wrap">
+				<text class="empty-icon">🐶</text>
+			</view>
 			<text class="empty-title">还没有宠物</text>
 			<text class="empty-desc">请先添加您的宠物，然后再添加记录</text>
 			<button class="add-pet-btn" @tap="goToAddPet">添加宠物</button>
@@ -13,20 +24,29 @@
 			<!-- 宠物选择 -->
 			<view class="form-item" v-if="pets.length > 1">
 				<view class="label">选择宠物 <text class="required">*</text></view>
-				<picker :range="petNames" :value="petIndex" @change="onPetChange" class="picker">
-					<view class="picker-input">
-						{{petIndex > -1 ? petNames[petIndex] : '请选择宠物'}}
+				<view class="pet-selector">
+					<view class="pet-option" 
+						  v-for="(pet, index) in pets" 
+						  :key="pet.id"
+						  :class="{active: petIndex === index}"
+						  @tap="selectPet(index)">
+						<image v-if="pet.avatar" :src="pet.avatar" mode="aspectFill" class="pet-avatar-small"></image>
+						<text v-else class="pet-avatar-placeholder">{{getPetIcon(pet.type)}}</text>
+						<text class="pet-name-text">{{pet.name}}</text>
 					</view>
-				</picker>
+				</view>
 			</view>
 
 			<!-- 只有一只宠物时显示 -->
 			<view class="form-item pet-display" v-if="pets.length === 1">
 				<view class="label">当前宠物</view>
-				<view class="selected-pet">
+				<view class="selected-pet-card">
 					<image v-if="pets[0].avatar" :src="pets[0].avatar" mode="aspectFill" class="pet-avatar-small"></image>
 					<text v-else class="pet-avatar-placeholder">{{getPetIcon(pets[0].type)}}</text>
-					<text class="pet-name-display">{{pets[0].name}}</text>
+					<view class="pet-info">
+						<text class="pet-name-text">{{pets[0].name}}</text>
+						<text class="pet-type-text">{{getPetTypeText(pets[0].type)}}</text>
+					</view>
 				</view>
 			</view>
 
@@ -34,8 +54,14 @@
 			<view class="form-item">
 				<view class="label">行为类型 <text class="required">*</text></view>
 				<view class="type-grid">
-					<view class="type-item" :class="{active: record.type === item.type}" v-for="item in recordTypes" :key="item.type" @tap="selectType(item)">
-						<text class="type-icon">{{item.icon}}</text>
+					<view class="type-item" 
+						  :class="{active: record.type === item.type}" 
+						  v-for="item in recordTypes" 
+						  :key="item.type" 
+						  @tap="selectType(item)">
+						<view class="type-icon-wrap">
+							<text class="type-icon">{{item.icon}}</text>
+						</view>
 						<text class="type-text">{{item.name}}</text>
 					</view>
 				</view>
@@ -46,7 +72,8 @@
 				<view class="label">记录时间 <text class="required">*</text></view>
 				<picker mode="multiSelector" :range="[dateRange, timeRange]" :value="dateTimeIndex" @change="onDateTimeChange">
 					<view class="picker-input">
-						{{record.date || '请选择时间'}}
+						<text class="picker-text">{{record.date || '请选择时间'}}</text>
+						<text class="picker-arrow">›</text>
 					</view>
 				</picker>
 			</view>
@@ -54,7 +81,10 @@
 			<!-- 备注信息 -->
 			<view class="form-item">
 				<view class="label">备注信息</view>
-				<textarea class="textarea" v-model="record.remark" :placeholder="getPlaceholder(record.type)" placeholder-class="placeholder" />
+				<textarea class="textarea" 
+						  v-model="record.remark" 
+						  :placeholder="getPlaceholder(record.type)" 
+						  placeholder-class="placeholder" />
 			</view>
 
 			<!-- 图片上传 -->
@@ -63,7 +93,9 @@
 				<view class="image-grid">
 					<view class="image-item" v-for="(img, index) in record.images" :key="index">
 						<image :src="img" mode="aspectFill" @tap="previewImage(index)"></image>
-						<view class="delete-btn" @tap="deleteImage(index)">×</view>
+						<view class="delete-btn" @tap="deleteImage(index)">
+							<text class="delete-icon">×</text>
+						</view>
 					</view>
 					<view class="image-item add-btn" v-if="record.images.length < 3" @tap="chooseImage">
 						<text class="add-icon">+</text>
@@ -76,7 +108,8 @@
 				<view class="label">下次提醒</view>
 				<picker mode="date" :value="record.nextReminder" @change="onReminderChange">
 					<view class="picker-input" :class="{placeholder: !record.nextReminder}">
-						{{record.nextReminder || '不设置提醒'}}
+						<text class="picker-text">{{record.nextReminder || '不设置提醒'}}</text>
+						<text class="picker-arrow">›</text>
 					</view>
 				</picker>
 			</view>
@@ -131,28 +164,22 @@
 				showReminder: false
 			}
 		},
-		computed: {
-			petNames() {
-				return this.pets.map(p => p.name);
-			}
-		},
 		async onLoad(options) {
-			// 初始化日期时间范围
 			this.initDateTimeRange();
-
-			// 加载宠物列表
 			await this.loadPets(options);
 
-			// 如果有预选类型
 			if (options.type) {
 				this.selectType(this.recordTypes.find(t => t.type === options.type));
 			}
 
-			// 设置默认时间为当前时间
 			const now = new Date();
 			this.record.date = this.formatDateTime(now);
 		},
 		methods: {
+			goBack() {
+				uni.navigateBack();
+			},
+
 			async loadPets(options) {
 				try {
 					const userId = await getUserId();
@@ -168,8 +195,8 @@
 					uni.showToast({ title: error.message || '加载宠物失败', icon: 'none' });
 				}
 			},
+
 			initDateTimeRange() {
-				// 生成最近7天的日期
 				const dates = [];
 				const now = new Date();
 				for (let i = 0; i < 7; i++) {
@@ -179,7 +206,6 @@
 				}
 				this.dateRange = dates;
 
-				// 生成24小时的时间
 				const times = [];
 				for (let i = 0; i < 24; i++) {
 					for (let j = 0; j < 60; j += 30) {
@@ -189,14 +215,13 @@
 				this.timeRange = times;
 			},
 
-			onPetChange(e) {
-				this.petIndex = e.detail.value;
-				this.record.petId = this.pets[e.detail.value].id;
+			selectPet(index) {
+				this.petIndex = index;
+				this.record.petId = this.pets[index].id;
 			},
 
 			selectType(item) {
 				this.record.type = item.type;
-				// 特定类型显示提醒设置
 				this.showReminder = ['vaccine', 'deworm', 'medical'].includes(item.type);
 			},
 
@@ -271,16 +296,25 @@
 
 			getPetIcon(type) {
 				const icons = {
-					'狗狗': '🐕',
-					'猫咪': '🐱',
-					'鸟类': '🐦',
-					'其他': '🐾'
+				'dog': '🐕',
+				'cat': '🐱',
+				'bird': '🐦',
+				'other': '🐶'
+			};
+			return icons[type] || '🐶';
+			},
+
+			getPetTypeText(type) {
+				const types = {
+					'dog': '狗狗',
+					'cat': '猫咪',
+					'bird': '鸟类',
+					'other': '其他'
 				};
-				return icons[type] || '🐾';
+				return types[type] || type;
 			},
 
 			async saveRecord() {
-				// 表单验证
 				if (!this.record.petId) {
 					uni.showToast({ title: '请选择宠物', icon: 'none' });
 					return;
@@ -365,12 +399,43 @@
 <style>
 	.container {
 		min-height: 100vh;
-		background-color: #f8f9fa;
-		padding: 30rpx;
-		padding-bottom: 120rpx;
+		background: linear-gradient(180deg, #FAF7F2 0%, #F5F0E8 100%);
 	}
 
-	/* 空状态样式 */
+	/* 导航栏 */
+	.nav-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 100rpx 32rpx 24rpx;
+		background: linear-gradient(135deg, #C4A77D 0%, #A68B5B 100%);
+	}
+
+	.nav-back {
+		width: 64rpx;
+		height: 64rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.back-icon {
+		font-size: 48rpx;
+		color: #FFFFFF;
+		font-weight: 300;
+	}
+
+	.nav-title {
+		font-size: 34rpx;
+		font-weight: 600;
+		color: #FFFFFF;
+	}
+
+	.nav-placeholder {
+		width: 64rpx;
+	}
+
+	/* 空状态 */
 	.empty-pet-state {
 		display: flex;
 		flex-direction: column;
@@ -379,41 +444,53 @@
 		padding: 200rpx 40rpx;
 	}
 
+	.empty-icon-wrap {
+		width: 160rpx;
+		height: 160rpx;
+		background: linear-gradient(135deg, #F4E4D6 0%, #E8D5C4 100%);
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		margin-bottom: 32rpx;
+	}
+
 	.empty-icon {
-		font-size: 120rpx;
-		margin-bottom: 24rpx;
-		opacity: 0.5;
+		font-size: 80rpx;
 	}
 
 	.empty-title {
 		font-size: 32rpx;
-		color: #333;
+		color: #3D3229;
 		font-weight: 700;
 		margin-bottom: 12rpx;
 	}
 
 	.empty-desc {
 		font-size: 26rpx;
-		color: #999;
+		color: #9B8B7A;
 		margin-bottom: 48rpx;
+		text-align: center;
 	}
 
 	.add-pet-btn {
-		background: linear-gradient(135deg, #ffb347, #ff8c42);
-		color: #fff;
-		font-weight: bold;
+		background: linear-gradient(135deg, #C4A77D 0%, #A68B5B 100%);
+		color: #FFFFFF;
+		font-weight: 600;
 		border-radius: 50rpx;
 		font-size: 32rpx;
 		padding: 24rpx 64rpx;
 		border: none;
-		box-shadow: 0 10rpx 25rpx rgba(255, 140, 66, 0.3);
+		box-shadow: 0 8rpx 24rpx rgba(196, 167, 125, 0.35);
 	}
 
+	/* 表单卡片 */
 	.form-card {
-		background-color: #fff;
-		border-radius: 32rpx;
-		padding: 40rpx;
-		box-shadow: 0 8rpx 30rpx rgba(0,0,0,0.05);
+		background: #FFFFFF;
+		border-radius: 36rpx 36rpx 0 0;
+		padding: 40rpx 32rpx;
+		margin-top: -20rpx;
+		min-height: calc(100vh - 188rpx);
 	}
 
 	.form-item {
@@ -423,60 +500,93 @@
 	.label {
 		font-size: 28rpx;
 		font-weight: 600;
-		color: #444;
+		color: #3D3229;
 		margin-bottom: 16rpx;
 	}
 
 	.required {
-		color: #ff6b6b;
+		color: #C4786E;
 		margin-left: 4rpx;
 	}
 
-	/* 宠物展示样式 */
+	/* 宠物选择器 */
+	.pet-selector {
+		display: flex;
+		gap: 16rpx;
+		overflow-x: auto;
+		padding-bottom: 8rpx;
+	}
+
+	.pet-option {
+		flex-shrink: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		background: #F5F0E8;
+		border-radius: 20rpx;
+		padding: 20rpx 24rpx;
+		min-width: 140rpx;
+		transition: all 0.2s ease;
+		border: 2rpx solid transparent;
+	}
+
+	.pet-option.active {
+		background: linear-gradient(135deg, #C4A77D 0%, #A68B5B 100%);
+		border-color: #C4A77D;
+	}
+
+	.pet-avatar-small {
+		width: 72rpx;
+		height: 72rpx;
+		border-radius: 50%;
+		margin-bottom: 12rpx;
+	}
+
+	.pet-avatar-placeholder {
+		width: 72rpx;
+		height: 72rpx;
+		border-radius: 50%;
+		background: linear-gradient(135deg, #F4E4D6 0%, #E8D5C4 100%);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 40rpx;
+		margin-bottom: 12rpx;
+	}
+
+	.pet-name-text {
+		font-size: 24rpx;
+		color: #6B5D4D;
+		font-weight: 500;
+	}
+
+	.pet-option.active .pet-name-text {
+		color: #FFFFFF;
+	}
+
+	/* 当前宠物展示 */
 	.pet-display {
-		background-color: #f8f9fa;
+		background: #F5F0E8;
 		border-radius: 20rpx;
 		padding: 24rpx;
 	}
 
-	.selected-pet {
+	.selected-pet-card {
 		display: flex;
 		align-items: center;
+		background: #FFFFFF;
+		border-radius: 16rpx;
+		padding: 20rpx;
 	}
 
-	.pet-avatar-small {
-		width: 80rpx;
-		height: 80rpx;
-		border-radius: 50%;
-		margin-right: 16rpx;
+	.pet-info {
+		margin-left: 20rpx;
 	}
 
-	.pet-avatar-placeholder {
-		font-size: 44rpx;
-		margin-right: 16rpx;
-	}
-
-	.pet-name-display {
-		font-size: 32rpx;
-		font-weight: 600;
-		color: #333;
-	}
-
-	.picker {
-		width: 100%;
-	}
-
-	.picker-input {
-		background-color: #f5f6f7;
-		padding: 24rpx 28rpx;
-		border-radius: 20rpx;
-		font-size: 28rpx;
-		color: #333;
-		border: 2rpx solid transparent;
-	}
-
-	.picker-input.placeholder {
-		color: #7a7a7a;
+	.pet-type-text {
+		font-size: 22rpx;
+		color: #9B8B7A;
+		margin-top: 4rpx;
 	}
 
 	/* 行为类型选择 */
@@ -487,51 +597,88 @@
 	}
 
 	.type-item {
-		background-color: #f5f6f7;
+		background: #F5F0E8;
 		border-radius: 20rpx;
-		padding: 24rpx 16rpx;
+		padding: 24rpx 12rpx;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		transition: all 0.3s;
+		transition: all 0.2s ease;
 		border: 2rpx solid transparent;
 	}
 
 	.type-item.active {
-		background: linear-gradient(135deg, #ffb347, #ff8c42);
-		border-color: #ffb347;
+		background: linear-gradient(135deg, #C4A77D 0%, #A68B5B 100%);
+		border-color: #C4A77D;
+	}
+
+	.type-icon-wrap {
+		width: 64rpx;
+		height: 64rpx;
+		background: #FFFFFF;
+		border-radius: 16rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		margin-bottom: 12rpx;
+	}
+
+	.type-item.active .type-icon-wrap {
+		background: rgba(255, 255, 255, 0.2);
 	}
 
 	.type-icon {
-		font-size: 40rpx;
-		margin-bottom: 8rpx;
+		font-size: 36rpx;
 	}
 
 	.type-text {
 		font-size: 22rpx;
-		color: #666;
+		color: #6B5D4D;
+		font-weight: 500;
 	}
 
 	.type-item.active .type-text {
-		color: #fff;
-		font-weight: 600;
+		color: #FFFFFF;
+	}
+
+	/* 选择器 */
+	.picker-input {
+		background: #F5F0E8;
+		padding: 24rpx 28rpx;
+		border-radius: 16rpx;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.picker-text {
+		font-size: 28rpx;
+		color: #3D3229;
+	}
+
+	.picker-input.placeholder .picker-text {
+		color: #B8A99A;
+	}
+
+	.picker-arrow {
+		font-size: 32rpx;
+		color: #B8A99A;
 	}
 
 	/* 备注输入 */
 	.textarea {
-		background-color: #f5f6f7;
+		background: #F5F0E8;
 		padding: 24rpx 28rpx;
-		border-radius: 20rpx;
+		border-radius: 16rpx;
 		font-size: 28rpx;
 		width: 100%;
 		height: 200rpx;
-		color: #333;
-		border: 2rpx solid transparent;
+		color: #3D3229;
 		box-sizing: border-box;
 	}
 
 	.placeholder {
-		color: #7a7a7a;
+		color: #B8A99A;
 	}
 
 	/* 图片上传 */
@@ -547,7 +694,7 @@
 		border-radius: 16rpx;
 		overflow: hidden;
 		position: relative;
-		background-color: #f5f6f7;
+		background: #F5F0E8;
 	}
 
 	.image-item image {
@@ -561,45 +708,53 @@
 		right: 8rpx;
 		width: 44rpx;
 		height: 44rpx;
-		background-color: rgba(0,0,0,0.5);
+		background: rgba(61, 50, 41, 0.6);
 		border-radius: 50%;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		color: #fff;
-		font-size: 32rpx;
-		line-height: 1;
+	}
+
+	.delete-icon {
+		color: #FFFFFF;
+		font-size: 28rpx;
+		font-weight: 300;
 	}
 
 	.add-btn {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		border: 2rpx dashed #ccc;
+		border: 2rpx dashed #D4C8B8;
+		background: transparent;
 	}
 
 	.add-icon {
-		font-size: 60rpx;
-		color: #999;
+		font-size: 56rpx;
+		color: #B8A99A;
+		font-weight: 300;
 	}
 
 	/* 提交按钮 */
 	.submit-section {
-		margin-top: 40rpx;
+		margin-top: 48rpx;
+		padding-bottom: 48rpx;
 	}
 
 	.submit-btn {
-		background: linear-gradient(135deg, #ffb347, #ff8c42);
-		color: #fff;
-		font-weight: bold;
+		background: linear-gradient(135deg, #C4A77D 0%, #A68B5B 100%);
+		color: #FFFFFF;
+		font-weight: 600;
 		border-radius: 50rpx;
 		font-size: 32rpx;
 		border: none;
-		box-shadow: 0 10rpx 25rpx rgba(255, 140, 66, 0.3);
+		box-shadow: 0 8rpx 24rpx rgba(196, 167, 125, 0.35);
+		height: 96rpx;
+		line-height: 96rpx;
 	}
 
 	.submit-btn:active {
-		opacity: 0.9;
+		opacity: 0.95;
 		transform: scale(0.98);
 	}
 </style>

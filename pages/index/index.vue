@@ -1,22 +1,27 @@
 <template>
 	<view class="container">
 		<!-- 顶部背景 -->
-		<view class="header-bg"></view>
+		<view class="header-bg">
+			<view class="header-pattern"></view>
+		</view>
 
-		<view class="header">
+		<view class="header anim-slide-down">
 			<view class="title">萌宠日记</view>
 			<view class="subtitle">记录每一刻的陪伴</view>
 		</view>
 
-		<view class="main-content">
+		<view class="main-content anim-slide-up delay-1">
 			<!-- 待提醒事项 -->
 			<view class="reminder-section" v-if="upcomingReminders.length > 0">
 				<view class="section-header">
 					<text class="section-title">待提醒事项</text>
+					<text class="view-all" @tap="navigateTo('/pages/reminder/index')">查看全部</text>
 				</view>
 				<scroll-view class="reminder-list" scroll-x>
-					<view class="reminder-card" v-for="reminder in upcomingReminders" :key="reminder.id" @tap="goToReminder(reminder)">
-						<text class="reminder-icon">{{getReminderIcon(reminder.type)}}</text>
+					<view class="reminder-card card-enter" v-for="(reminder, index) in upcomingReminders" :key="reminder.id" @tap="goToReminder(reminder)" :style="{animationDelay: index * 0.05 + 's'}">
+						<view class="reminder-icon-wrap">
+							<text class="reminder-icon">{{getReminderIcon(reminder.type)}}</text>
+						</view>
 						<view class="reminder-info">
 							<text class="reminder-title">{{reminder.title}}</text>
 							<text class="reminder-pet">{{reminder.petName}}</text>
@@ -31,8 +36,10 @@
 					<text class="section-title">快捷记录</text>
 				</view>
 				<view class="quick-record-grid">
-					<view class="quick-record-item" v-for="item in recordTypes" :key="item.type" @tap="quickRecord(item)">
-						<text class="quick-record-icon">{{item.icon}}</text>
+					<view class="quick-record-item card-enter" v-for="(item, index) in recordTypes.slice(0, 8)" :key="item.type" @tap="quickRecord(item)" :style="{animationDelay: (index * 0.03) + 's'}">
+						<view class="icon-wrap">
+							<text class="quick-record-icon">{{item.icon}}</text>
+						</view>
 						<text class="quick-record-text">{{item.name}}</text>
 					</view>
 				</view>
@@ -42,11 +49,14 @@
 			<view class="pets-section">
 				<view class="section-header">
 					<text class="section-title">我的宠物</text>
-					<text class="add-pet-btn" @tap="navigateTo('/pages/pet/add')">+ 添加</text>
+					<view class="add-pet-btn anim-breathe" @tap="navigateTo('/pages/pet/add')">
+						<text class="add-icon">+</text>
+						<text class="add-text">添加</text>
+					</view>
 				</view>
 
 				<view class="pet-list" v-if="pets.length > 0">
-					<view class="pet-card" v-for="pet in pets" :key="pet.id" @tap="goToPetDetail(pet)">
+					<view class="pet-card card-enter" v-for="(pet, index) in pets" :key="pet.id" @tap="goToPetDetail(pet)" :style="{animationDelay: (index * 0.08) + 's'}">
 						<view class="pet-avatar">
 							<image :src="pet.avatar || '/static/default-pet.png'" mode="aspectFill"></image>
 						</view>
@@ -61,34 +71,52 @@
 							<text class="record-icon">{{getRecordIcon(pet.latestRecord.type)}}</text>
 							<text class="record-text">{{formatRecordTime(pet.latestRecord.date)}}</text>
 						</view>
+						<view class="arrow-icon" v-else>
+							<text class="arrow">›</text>
+						</view>
 					</view>
 				</view>
 
-				<view class="empty-state" v-if="pets.length === 0">
-					<text class="empty-icon">🐾</text>
+				<view class="empty-state-custom" v-if="pets.length === 0">
+					<view class="empty-icon-wrap">
+						<text class="empty-icon">🐶</text>
+					</view>
 					<text class="empty-text">还没有添加宠物</text>
-					<text class="empty-tip">点击右上角添加您的第一只宠物</text>
+					<text class="empty-tip">点击上方按钮添加您的第一只宠物</text>
 				</view>
 			</view>
+		</view>
 
-			<!-- 底部导航 -->
-			<view class="tab-bar">
-				<view class="tab-item active" @tap="currentTab = 0">
+		<!-- 底部导航 -->
+		<view class="tab-bar anim-slide-up delay-2">
+			<view class="tab-item" :class="{active: currentTab === 0}" @tap="switchTab(0)">
+				<view class="tab-icon-wrap">
 					<text class="tab-icon">🏠</text>
-					<text class="tab-text">首页</text>
 				</view>
-				<view class="tab-item" @tap="currentTab = 1">
+				<text class="tab-text">首页</text>
+			</view>
+			<view class="tab-item" :class="{active: currentTab === 1}" @tap="switchTab(1)">
+				<view class="tab-icon-wrap">
 					<text class="tab-icon">📝</text>
-					<text class="tab-text">记录</text>
 				</view>
-				<view class="tab-item" @tap="currentTab = 2">
+				<text class="tab-text">记录</text>
+			</view>
+			<view class="tab-item center-btn" @tap="quickAdd">
+				<view class="center-icon-wrap anim-float">
+					<text class="center-icon">+</text>
+				</view>
+			</view>
+			<view class="tab-item" :class="{active: currentTab === 2}" @tap="switchTab(2)">
+				<view class="tab-icon-wrap">
 					<text class="tab-icon">📊</text>
-					<text class="tab-text">统计</text>
 				</view>
-				<view class="tab-item" @tap="currentTab = 3">
+				<text class="tab-text">统计</text>
+			</view>
+			<view class="tab-item" :class="{active: currentTab === 3}" @tap="switchTab(3)">
+				<view class="tab-icon-wrap">
 					<text class="tab-icon">⏰</text>
-					<text class="tab-text">提醒</text>
 				</view>
+				<text class="tab-text">提醒</text>
 			</view>
 		</view>
 	</view>
@@ -130,23 +158,6 @@
 		onShow() {
 			this.loadData();
 		},
-		watch: {
-			currentTab(newVal) {
-				switch(newVal) {
-					case 0:
-						break;
-					case 1:
-						uni.navigateTo({ url: '/pages/record/list' });
-						break;
-					case 2:
-						uni.navigateTo({ url: '/pages/record/statistics' });
-						break;
-					case 3:
-						uni.navigateTo({ url: '/pages/reminder/index' });
-						break;
-				}
-			}
-		},
 		methods: {
 			async loadData() {
 				try {
@@ -171,6 +182,31 @@
 					this.pets = [];
 					this.upcomingReminders = [];
 					uni.showToast({ title: error.message || '加载失败', icon: 'none' });
+				}
+			},
+
+			switchTab(index) {
+				this.currentTab = index;
+				switch(index) {
+					case 0:
+						break;
+					case 1:
+						uni.navigateTo({ url: '/pages/record/list' });
+						break;
+					case 2:
+						uni.navigateTo({ url: '/pages/record/statistics' });
+						break;
+					case 3:
+						uni.navigateTo({ url: '/pages/reminder/index' });
+						break;
+				}
+			},
+
+			quickAdd() {
+				if (this.pets.length === 0) {
+					uni.navigateTo({ url: '/pages/pet/add' });
+				} else {
+					uni.navigateTo({ url: '/pages/record/add' });
 				}
 			},
 
@@ -256,7 +292,7 @@
 					return directDate;
 				}
 
-				const match = dateStr.match(/^([\d]{1,2})月([\d]{1,2})日\s*([\d]{1,2})?:?([\d]{2})?$/);
+				const match = dateStr.match(/^(\d{1,2})月(\d{1,2})日\s*(\d{1,2})?:(\d{2})?$/);
 				if (!match) return new Date(0);
 
 				const [, monthStr, dayStr, hourStr, minuteStr] = match;
@@ -298,46 +334,85 @@
 <style>
 	.container {
 		min-height: 100vh;
-		background-color: #f8f9fa;
-		padding-bottom: 120rpx;
+		background: linear-gradient(180deg, #FAF7F2 0%, #F5F0E8 100%);
+		padding-bottom: 140rpx;
 	}
 
+	/* 顶部背景 */
 	.header-bg {
 		position: absolute;
 		top: 0;
 		left: 0;
 		right: 0;
-		height: 400rpx;
-		background: linear-gradient(135deg, #ffb347, #ff6b6b);
-		border-radius: 0 0 60rpx 60rpx;
-		z-index: 0;
+		height: 420rpx;
+		background: linear-gradient(135deg, #C4A77D 0%, #A68B5B 100%);
+		border-radius: 0 0 48rpx 48rpx;
+		overflow: hidden;
+	}
+
+	.header-pattern {
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background-image: radial-gradient(circle at 20% 80%, rgba(255,255,255,0.1) 0%, transparent 50%),
+		                  radial-gradient(circle at 80% 20%, rgba(255,255,255,0.08) 0%, transparent 40%);
 	}
 
 	.header {
 		position: relative;
 		z-index: 1;
-		padding: 100rpx 40rpx 40rpx;
+		padding: 100rpx 40rpx 50rpx;
 		text-align: center;
 	}
 
 	.title {
-		font-size: 56rpx;
-		font-weight: 800;
-		color: #fff;
+		font-size: 52rpx;
+		font-weight: 700;
+		color: #FFFFFF;
 		margin-bottom: 12rpx;
 		letter-spacing: 4rpx;
+		text-shadow: 0 2rpx 8rpx rgba(0,0,0,0.1);
 	}
 
 	.subtitle {
-		font-size: 28rpx;
-		color: rgba(255, 255, 255, 0.9);
+		font-size: 26rpx;
+		color: rgba(255, 255, 255, 0.85);
+		font-weight: 400;
 	}
 
 	.main-content {
 		position: relative;
 		z-index: 1;
-		padding: 0 40rpx;
+		padding: 0 32rpx;
 		margin-top: -20rpx;
+	}
+
+	/* 区块标题 */
+	.section-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 24rpx;
+	}
+
+	.section-title {
+		font-size: 32rpx;
+		font-weight: 700;
+		color: #3D3229;
+	}
+
+	.view-all {
+		font-size: 24rpx;
+		color: #C4A77D;
+		font-weight: 500;
+		transition: all 0.2s ease;
+	}
+
+	.view-all:active {
+		transform: scale(0.95);
+		opacity: 0.8;
 	}
 
 	/* 提醒区域 */
@@ -353,16 +428,38 @@
 	.reminder-card {
 		display: inline-flex;
 		align-items: center;
-		background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+		background: linear-gradient(135deg, #FFFBF7 0%, #F5F0E8 100%);
 		border-radius: 24rpx;
-		padding: 24rpx 32rpx;
+		padding: 28rpx 32rpx;
 		margin-right: 20rpx;
-		box-shadow: 0 6rpx 20rpx rgba(255, 152, 0, 0.15);
+		box-shadow: 0 4rpx 16rpx rgba(61, 50, 41, 0.08);
+		border: 2rpx solid rgba(196, 167, 125, 0.15);
+		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	}
+
+	.reminder-card:active {
+		transform: scale(0.95);
+		box-shadow: 0 2rpx 8rpx rgba(61, 50, 41, 0.04);
+	}
+
+	.reminder-icon-wrap {
+		width: 72rpx;
+		height: 72rpx;
+		background: linear-gradient(135deg, #C4A77D 0%, #A68B5B 100%);
+		border-radius: 18rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		margin-right: 20rpx;
+		transition: all 0.3s ease;
+	}
+
+	.reminder-card:active .reminder-icon-wrap {
+		transform: scale(0.9) rotate(10deg);
 	}
 
 	.reminder-icon {
-		font-size: 40rpx;
-		margin-right: 16rpx;
+		font-size: 36rpx;
 	}
 
 	.reminder-info {
@@ -371,15 +468,15 @@
 	}
 
 	.reminder-title {
-		font-size: 26rpx;
+		font-size: 28rpx;
 		font-weight: 600;
-		color: #e65100;
-		margin-bottom: 4rpx;
+		color: #3D3229;
+		margin-bottom: 6rpx;
 	}
 
 	.reminder-pet {
 		font-size: 22rpx;
-		color: #ff9800;
+		color: #9B8B7A;
 	}
 
 	/* 快捷记录区域 */
@@ -394,28 +491,50 @@
 	}
 
 	.quick-record-item {
-		background-color: #fff;
-		border-radius: 20rpx;
-		padding: 32rpx 16rpx;
+		background: #FFFFFF;
+		border-radius: 24rpx;
+		padding: 28rpx 16rpx;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.05);
-		transition: all 0.3s;
+		box-shadow: 0 4rpx 16rpx rgba(61, 50, 41, 0.06);
+		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 	}
 
 	.quick-record-item:active {
-		transform: scale(0.95);
+		transform: scale(0.92) translateY(-4rpx);
+		box-shadow: 0 8rpx 24rpx rgba(196, 167, 125, 0.2);
+	}
+
+	.icon-wrap {
+		width: 80rpx;
+		height: 80rpx;
+		background: linear-gradient(135deg, #F4E4D6 0%, #E8D5C4 100%);
+		border-radius: 20rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		margin-bottom: 16rpx;
+		transition: all 0.3s ease;
+	}
+
+	.quick-record-item:active .icon-wrap {
+		transform: scale(1.1) rotate(-5deg);
+		background: linear-gradient(135deg, #C4A77D 0%, #A68B5B 100%);
+	}
+
+	.quick-record-item:active .quick-record-icon {
+		filter: brightness(0) invert(1);
 	}
 
 	.quick-record-icon {
-		font-size: 48rpx;
-		margin-bottom: 12rpx;
+		font-size: 40rpx;
+		transition: all 0.3s ease;
 	}
 
 	.quick-record-text {
 		font-size: 22rpx;
-		color: #666;
+		color: #6B5D4D;
 		font-weight: 500;
 	}
 
@@ -424,26 +543,36 @@
 		margin-bottom: 40rpx;
 	}
 
-	.section-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 24rpx;
-	}
-
-	.section-title {
-		font-size: 32rpx;
-		font-weight: 700;
-		color: #333;
-	}
-
 	.add-pet-btn {
-		font-size: 26rpx;
-		color: #ff6b6b;
-		font-weight: 600;
+		display: flex;
+		align-items: center;
+		background: linear-gradient(135deg, #C4A77D 0%, #A68B5B 100%);
 		padding: 12rpx 24rpx;
-		background: rgba(255, 107, 107, 0.1);
-		border-radius: 20rpx;
+		border-radius: 28rpx;
+		transition: all 0.3s ease;
+	}
+
+	.add-pet-btn:active {
+		transform: scale(0.95);
+		box-shadow: 0 4rpx 16rpx rgba(196, 167, 125, 0.3);
+	}
+
+	.add-icon {
+		font-size: 28rpx;
+		color: #FFFFFF;
+		margin-right: 8rpx;
+		font-weight: 600;
+		transition: transform 0.3s ease;
+	}
+
+	.add-pet-btn:active .add-icon {
+		transform: rotate(90deg);
+	}
+
+	.add-text {
+		font-size: 24rpx;
+		color: #FFFFFF;
+		font-weight: 500;
 	}
 
 	.pet-list {
@@ -453,30 +582,48 @@
 	}
 
 	.pet-card {
-		background-color: #fff;
+		background: #FFFFFF;
 		border-radius: 28rpx;
-		padding: 32rpx;
+		padding: 28rpx;
 		display: flex;
 		align-items: center;
-		box-shadow: 0 6rpx 20rpx rgba(0,0,0,0.06);
+		box-shadow: 0 4rpx 20rpx rgba(61, 50, 41, 0.06);
+		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	}
+
+	.pet-card:active {
+		transform: translateX(12rpx) scale(0.98);
+		box-shadow: 0 8rpx 32rpx rgba(61, 50, 41, 0.1);
 	}
 
 	.pet-avatar {
-		width: 120rpx;
-		height: 120rpx;
+		width: 100rpx;
+		height: 100rpx;
 		border-radius: 50%;
 		overflow: hidden;
 		margin-right: 24rpx;
-		background: linear-gradient(135deg, #ffe0b2, #ffcc80);
+		background: linear-gradient(135deg, #F4E4D6 0%, #E8D5C4 100%);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		flex-shrink: 0;
+		border: 4rpx solid #F5F0E8;
+		transition: all 0.3s ease;
+	}
+
+	.pet-card:active .pet-avatar {
+		transform: scale(1.1);
+		border-color: #C4A77D;
 	}
 
 	.pet-avatar image {
 		width: 100%;
 		height: 100%;
+		transition: transform 0.3s ease;
+	}
+
+	.pet-card:active .pet-avatar image {
+		transform: scale(1.1);
 	}
 
 	.pet-info {
@@ -488,69 +635,122 @@
 	.pet-name {
 		font-size: 32rpx;
 		font-weight: 700;
-		color: #333;
-		margin-bottom: 8rpx;
+		color: #3D3229;
+		margin-bottom: 10rpx;
+		transition: color 0.3s ease;
+	}
+
+	.pet-card:active .pet-name {
+		color: #C4A77D;
 	}
 
 	.pet-meta {
 		display: flex;
 		gap: 16rpx;
+		align-items: center;
 	}
 
 	.pet-type {
-		font-size: 24rpx;
-		color: #ff6b6b;
-		padding: 4rpx 12rpx;
-		background: rgba(255, 107, 107, 0.1);
+		font-size: 22rpx;
+		color: #C4A77D;
+		padding: 6rpx 16rpx;
+		background: #F4E4D6;
 		border-radius: 12rpx;
+		font-weight: 500;
 	}
 
 	.pet-age {
-		font-size: 24rpx;
-		color: #999;
+		font-size: 22rpx;
+		color: #9B8B7A;
 	}
 
 	.pet-latest-record {
 		display: flex;
 		align-items: center;
-		background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+		background: linear-gradient(135deg, #F4E4D6 0%, #E8D5C4 100%);
 		padding: 16rpx 20rpx;
-		border-radius: 20rpx;
+		border-radius: 16rpx;
+		margin-left: 16rpx;
+		transition: all 0.3s ease;
+	}
+
+	.pet-card:active .pet-latest-record {
+		transform: scale(1.05);
+		background: linear-gradient(135deg, #C4A77D 0%, #A68B5B 100%);
+	}
+
+	.pet-card:active .pet-latest-record .record-icon,
+	.pet-card:active .pet-latest-record .record-text {
+		color: #FFFFFF;
 	}
 
 	.record-icon {
 		font-size: 28rpx;
 		margin-right: 8rpx;
+		transition: all 0.3s ease;
 	}
 
 	.record-text {
-		font-size: 22rpx;
-		color: #1976d2;
+		font-size: 20rpx;
+		color: #6B5D4D;
+		font-weight: 500;
+		transition: all 0.3s ease;
 	}
 
-	.empty-state {
+	.arrow-icon {
+		margin-left: 16rpx;
+		transition: all 0.3s ease;
+	}
+
+	.pet-card:active .arrow-icon {
+		transform: translateX(8rpx);
+	}
+
+	.arrow {
+		font-size: 40rpx;
+		color: #B8A99A;
+		transition: color 0.3s ease;
+	}
+
+	.pet-card:active .arrow {
+		color: #C4A77D;
+	}
+
+	/* 空状态 */
+	.empty-state-custom {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		padding: 100rpx 0;
+		padding: 80rpx 0;
+		animation: fadeIn 0.6s ease-out;
+	}
+
+	.empty-icon-wrap {
+		width: 140rpx;
+		height: 140rpx;
+		background: linear-gradient(135deg, #F4E4D6 0%, #E8D5C4 100%);
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		margin-bottom: 24rpx;
+		animation: float 3s ease-in-out infinite;
 	}
 
 	.empty-icon {
-		font-size: 120rpx;
-		margin-bottom: 24rpx;
-		opacity: 0.5;
+		font-size: 72rpx;
 	}
 
 	.empty-text {
-		font-size: 28rpx;
-		color: #999;
+		font-size: 30rpx;
+		color: #3D3229;
 		margin-bottom: 12rpx;
 		font-weight: 600;
 	}
 
 	.empty-tip {
 		font-size: 24rpx;
-		color: #ccc;
+		color: #9B8B7A;
 	}
 
 	/* 底部导航栏 */
@@ -559,11 +759,11 @@
 		bottom: 0;
 		left: 0;
 		right: 0;
-		background-color: #fff;
+		background: #FFFFFF;
 		display: flex;
-		box-shadow: 0 -4rpx 20rpx rgba(0,0,0,0.06);
+		box-shadow: 0 -4rpx 20rpx rgba(61, 50, 41, 0.08);
 		border-radius: 40rpx 40rpx 0 0;
-		padding: 20rpx 0;
+		padding: 16rpx 0 32rpx;
 		z-index: 100;
 	}
 
@@ -573,21 +773,82 @@
 		flex-direction: column;
 		align-items: center;
 		padding: 8rpx 0;
+		transition: all 0.3s ease;
+	}
+
+	.tab-item:active {
+		transform: scale(0.9);
+	}
+
+	.tab-icon-wrap {
+		width: 56rpx;
+		height: 56rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		margin-bottom: 6rpx;
+		border-radius: 16rpx;
+		transition: all 0.3s ease;
+	}
+
+	.tab-item.active .tab-icon-wrap {
+		background: linear-gradient(135deg, #C4A77D 0%, #A68B5B 100%);
+		animation: pulse 0.3s ease;
 	}
 
 	.tab-icon {
-		font-size: 44rpx;
-		margin-bottom: 4rpx;
+		font-size: 40rpx;
+		transition: all 0.3s ease;
+	}
+
+	.tab-item.active .tab-icon {
+		filter: brightness(0) invert(1);
 	}
 
 	.tab-text {
-		font-size: 22rpx;
-		color: #999;
+		font-size: 20rpx;
+		color: #9B8B7A;
 		font-weight: 500;
+		transition: all 0.3s ease;
 	}
 
 	.tab-item.active .tab-text {
-		color: #ff6b6b;
-		font-weight: 700;
+		color: #C4A77D;
+		font-weight: 600;
+	}
+
+	/* 中间添加按钮 */
+	.center-btn {
+		position: relative;
+		top: -30rpx;
+	}
+
+	.center-icon-wrap {
+		width: 100rpx;
+		height: 100rpx;
+		background: linear-gradient(135deg, #C4A77D 0%, #A68B5B 100%);
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-shadow: 0 8rpx 24rpx rgba(196, 167, 125, 0.4);
+		border: 6rpx solid #FAF7F2;
+		transition: all 0.3s ease;
+	}
+
+	.center-btn:active .center-icon-wrap {
+		transform: scale(0.9);
+		box-shadow: 0 4rpx 12rpx rgba(196, 167, 125, 0.3);
+	}
+
+	.center-icon {
+		font-size: 56rpx;
+		color: #FFFFFF;
+		font-weight: 300;
+		transition: transform 0.3s ease;
+	}
+
+	.center-btn:active .center-icon {
+		transform: rotate(90deg);
 	}
 </style>
